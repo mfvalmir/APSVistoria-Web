@@ -1,0 +1,40 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --cor-marca: #6b4a3a;
+  --cor-marca-hover: #5c3e30;
+  --cor-marca-texto: #f2ede8;
+  --cor-fundo: #fdfcfb;
+  --cor-fundo-secundario: #f5f2ef;
+  --cor-fundo-hover: #ece5de;
+  --cor-borda: #ddd6cf;
+  --cor-borda-input: #b9b3ac;
+  --cor-texto: #4a4a4a;
+  --cor-texto-titulo: #5a5a5a;
+  --cor-texto-fraco: #8a8a8a;
+  --cor-erro: #a33a2c;
+}
+
+:root[data-theme="dark"] {
+  --cor-marca: #8a6a58;
+  --cor-marca-hover: #9c7a66;
+  --cor-marca-texto: #f2ede8;
+  --cor-fundo: #1c1917;
+  --cor-fundo-secundario: #262220;
+  --cor-fundo-hover: #322c28;
+  --cor-borda: #3d352d;
+  --cor-borda-input: #55483d;
+  --cor-texto: #e8e3de;
+  --cor-texto-titulo: #f2ede8;
+  --cor-texto-fraco: #a89a8f;
+  --cor-erro: #e0685a;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+}

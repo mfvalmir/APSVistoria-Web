@@ -1,9 +1,19 @@
 import { api } from "./client";
 
 export interface Usuario {
-  id: number;
-  nome: string;
-  usuario: string;
+  IDUser: number;
+  IDFuncionario: number;
+  Loginn: string;
+  Situacao: string;
+  Administrador: string;
+  NomeFuncionario: string | null;
+}
+
+export interface NovoUsuario {
+  idFuncionario: number;
+  login: string;
+  senha: string;
+  administrador: boolean;
 }
 
 export async function listarUsuarios(): Promise<Usuario[]> {
@@ -11,6 +21,6 @@ export async function listarUsuarios(): Promise<Usuario[]> {
   return data;
 }
 
-export async function criarUsuario(nome: string, usuario: string): Promise<void> {
-  await api.post("/usuarios", { nome, usuario });
+export async function criarUsuario(dados: NovoUsuario): Promise<void> {
+  await api.post("/usuarios", dados);
 }

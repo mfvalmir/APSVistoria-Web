@@ -3,6 +3,7 @@ import cors from "cors";
 import "dotenv/config";
 import usuariosRouter from "./routes/usuarios";
 import authRouter from "./routes/auth";
+import menuRouter from "./routes/menu";
 
 const app = express();
 
@@ -18,9 +19,10 @@ app.use(
 
 app.use("/usuarios", usuariosRouter);
 app.use("/auth", authRouter);
+app.use("/menu", menuRouter);
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", banco: process.env.DB_NAME });
 });
 
 const PORT = process.env.PORT || 3000;

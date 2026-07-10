@@ -1,7 +1,7 @@
 import { Router } from "express";
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { getPool, sql } from "../db";
+import { criptografar } from "../legacyCrypt";
 
 const router = Router();
 
@@ -17,23 +17,35 @@ router.post("/login", async (req, res) => {
     const pool = await getPool();
     const result = await pool
       .request()
-      .input("usuario", sql.VarChar, usuario)
-      .query("SELECT id, nome, senha_hash FROM usuarios WHERE usuario = @usuario");
+      .input("login", sql.VarChar, usuario)
+      .query(
+        `SELECT u.IDUser, u.IDFuncionario, u.Loginn, u.Senha, u.Situacao, u.Administrador,
+                f.NomeFuncionario
+         FROM usuario u
+         LEFT JOIN Funcionario f ON f.IdFuncionario = u.IDFuncionario
+         WHERE u.Loginn = @login`
+      );
 
     const user = result.recordset[0];
-    if (!user) {
+    if (!user || user.Situacao.trim() !== "A") {
       return res.status(401).json({ erro: "Usuário ou senha inválidos" });
     }
 
-    const senhaOk = await bcrypt.compare(senha, user.senha_hash);
-    if (!senhaOk) {
+    const senhaCriptografada = criptografar(process.env.LEGACY_CRYPT_KEY as string, senha);
+    if (senhaCriptografada !== user.Senha.trim().toLowerCase()) {
       return res.status(401).json({ erro: "Usuário ou senha inválidos" });
     }
 
     const token = jwt.sign(
-      { id: user.id, nome: user.nome },
+      {
+        id: user.IDUser,
+        idFuncionario: user.IDFuncionario,
+        nome: user.NomeFuncionario,
+        login: user.Loginn,
+        administrador: user.Administrador.trim() === "S",
+      },
       process.env.JWT_SECRET as string,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "8h" }
+      { expiresIn: (process.env.JWT_EXPIRES_IN || "8h") as jwt.SignOptions["expiresIn"] }
     );
 
     res.json({ token });

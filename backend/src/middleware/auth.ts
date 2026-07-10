@@ -2,7 +2,13 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 export interface AuthRequest extends Request {
-  user?: { id: number; nome: string };
+  user?: {
+    id: number;
+    idFuncionario: number;
+    nome: string;
+    login: string;
+    administrador: boolean;
+  };
 }
 
 // Aplique este middleware nas rotas que exigem login.
@@ -20,7 +26,10 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET as string) as {
       id: number;
+      idFuncionario: number;
       nome: string;
+      login: string;
+      administrador: boolean;
     };
     req.user = payload;
     next();

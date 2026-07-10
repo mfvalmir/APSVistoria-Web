@@ -1,0 +1,104 @@
+.app-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--cor-marca);
+  color: var(--cor-marca-texto);
+  padding: 0 16px;
+  height: 60px;
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-header-toggle {
+  background: none;
+  border: none;
+  color: var(--cor-marca-texto);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.app-header-brand {
+  font-weight: 700;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.app-header-versao {
+  font-size: 13px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.app-header-separator {
+  opacity: 0.5;
+}
+
+.app-header-grupo {
+  font-size: 16px;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.app-header-titulo {
+  font-size: 16px;
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.app-header-theme-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--cor-marca-texto);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.app-header-theme-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.app-header-usuario {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+
+.app-header-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: var(--cor-marca-texto);
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.app-header-logout:hover {
+  background-color: rgba(255, 255, 255, 0.22);
+}

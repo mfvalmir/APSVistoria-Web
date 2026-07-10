@@ -1,0 +1,12 @@
+.app-footer {
+  grid-area: footer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--cor-fundo-secundario);
+  border-top: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-size: 12px;
+  padding: 0 16px;
+  height: 32px;
+}
