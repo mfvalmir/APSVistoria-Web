@@ -25,7 +25,7 @@ function Login({ onLoginSuccess }: LoginProps) {
     setCarregando(true);
     try {
       const token = await login(usuario, senha);
-      localStorage.setItem("token", token);
+      sessionStorage.setItem("token", token);
       onLoginSuccess();
     } catch (err) {
       if (isAxiosError(err) && err.response) {

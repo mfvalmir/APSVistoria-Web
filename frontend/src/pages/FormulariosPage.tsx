@@ -1,21 +1,33 @@
 import { useEffect, useState } from "react";
-import { Search, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarFormularios, desativarFormulario, Formulario } from "../api/formularios";
 import { ItemMenu } from "../api/menu";
 import { getIcone } from "../components/iconRegistry";
 import FormularioForm from "./FormularioForm";
+import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
 import "./FormulariosPage.css";
 
 type SubView = "lista" | "form";
 
 const ITENS_POR_PAGINA = 15;
 
+const COLUNAS: OpcaoColuna[] = [
+  { chave: "id", label: "ID" },
+  { chave: "descricao", label: "Descrição" },
+  { chave: "nome", label: "Nome" },
+  { chave: "grupo", label: "Grupo" },
+  { chave: "status", label: "Status" },
+];
+const COLUNAS_PADRAO = ["descricao", "nome", "grupo", "status"];
+
 interface FormulariosPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
+  voltarInicio: () => void;
 }
 
-function FormulariosPage({ permissoes }: FormulariosPageProps) {
+function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
@@ -28,6 +40,19 @@ function FormulariosPage({ permissoes }: FormulariosPageProps) {
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<"A" | "I" | "">("A");
   const [pagina, setPagina] = useState(1);
+  const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
+    obterColunasVisiveis("formularios", COLUNAS_PADRAO)
+  );
+
+  function alternarColuna(chave: string) {
+    setColunasVisiveis((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      salvarColunasVisiveis("formularios", novo);
+      return novo;
+    });
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -84,6 +109,17 @@ function FormulariosPage({ permissoes }: FormulariosPageProps) {
   return (
     <div className="formularios-page">
       <div className="formularios-toolbar">
+        <button
+          type="button"
+          className="formularios-btn-voltar"
+          title="Voltar para Início"
+          onClick={voltarInicio}
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <SeletorColunas colunas={COLUNAS} visiveis={colunasVisiveis} onToggle={alternarColuna} />
+
         <div className="formularios-busca">
           <Search size={16} />
           <input
@@ -91,6 +127,16 @@ function FormulariosPage({ permissoes }: FormulariosPageProps) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
+          {busca && (
+            <button
+              type="button"
+              className="formularios-busca-limpar"
+              title="Limpar busca"
+              onClick={() => setBusca("")}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <select
@@ -116,21 +162,22 @@ function FormulariosPage({ permissoes }: FormulariosPageProps) {
         <table className="formularios-tabela">
           <thead>
             <tr>
-              <th>Descrição</th>
-              <th>Nome</th>
-              <th>Grupo</th>
-              <th className="formularios-col-status">Status</th>
+              {colunasVisiveis.has("id") && <th>ID</th>}
+              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
+              {colunasVisiveis.has("nome") && <th>Nome</th>}
+              {colunasVisiveis.has("grupo") && <th>Grupo</th>}
+              {colunasVisiveis.has("status") && <th className="formularios-col-status">Status</th>}
               <th className="formularios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={5} className="formularios-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 1} className="formularios-vazio">Carregando...</td>
               </tr>
             ) : formulariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={5} className="formularios-vazio">Nenhum formulário encontrado</td>
+                <td colSpan={colunasVisiveis.size + 1} className="formularios-vazio">Nenhum formulário encontrado</td>
               </tr>
             ) : (
               formulariosPagina.map((f) => {
@@ -138,17 +185,24 @@ function FormulariosPage({ permissoes }: FormulariosPageProps) {
                 const Icone = getIcone(f.Icone);
                 return (
                   <tr key={f.FormularioID}>
-                    <td className="formularios-col-descricao">
-                      <Icone size={16} />
-                      {f.Descricao || "-"}
-                    </td>
-                    <td>{f.NomeFormulario}</td>
-                    <td>{f.Grupo || "-"}</td>
-                    <td className="formularios-col-status">
-                      <span className={`formularios-badge ${ativo ? "ativo" : "inativo"}`}>
-                        {ativo ? "ATIVO" : "INATIVO"}
-                      </span>
-                    </td>
+                    {colunasVisiveis.has("id") && <td>{f.FormularioID}</td>}
+                    {colunasVisiveis.has("descricao") && (
+                      <td className="formularios-col-descricao">
+                        <span className="formularios-descricao-conteudo">
+                          <Icone size={16} />
+                          {f.Descricao || "-"}
+                        </span>
+                      </td>
+                    )}
+                    {colunasVisiveis.has("nome") && <td>{f.NomeFormulario}</td>}
+                    {colunasVisiveis.has("grupo") && <td>{f.Grupo || "-"}</td>}
+                    {colunasVisiveis.has("status") && (
+                      <td className="formularios-col-status">
+                        <span className={`formularios-badge ${ativo ? "ativo" : "inativo"}`}>
+                          {ativo ? "ATIVO" : "INATIVO"}
+                        </span>
+                      </td>
+                    )}
                     <td className="formularios-col-acoes">
                       {podeEditar && (
                         <button

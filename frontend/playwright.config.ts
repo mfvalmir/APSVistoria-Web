@@ -5,13 +5,11 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   reporter: "html",
-  globalSetup: "./e2e/global-setup.ts",
 
   use: {
     baseURL: "http://localhost:5173",
     viewport: { width: 1440, height: 900 },
     trace: "on-first-retry",
-    storageState: path.join(import.meta.dirname, "e2e/.auth/storageState.json"),
   },
 
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

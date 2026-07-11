@@ -6,11 +6,25 @@ export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
 
-// Se/quando ativar login, injeta o token JWT automaticamente em toda requisição.
+// Token em sessionStorage (não localStorage): mantém login ao recarregar a página,
+// mas encerra a sessão ao fechar a aba.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+// Token expirado/inválido em qualquer chamada autenticada: limpa a sessão e força
+// a volta pro Login (em vez de deixar a página atual quebrada chamando API sem sessão válida).
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && sessionStorage.getItem("token")) {
+      sessionStorage.removeItem("token");
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);

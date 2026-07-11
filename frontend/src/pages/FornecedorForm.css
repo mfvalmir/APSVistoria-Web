@@ -1,0 +1,25 @@
+.fornecedor-form-textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cor-borda-input);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+.fornecedor-form-textarea:focus {
+  border-color: var(--cor-marca);
+}
+
+.fornecedor-form-campo-documento {
+  flex: 0 0 200px;
+  min-width: 200px;
+}
+
+.fornecedor-form-campo-telefone {
+  flex: 0 0 200px;
+  min-width: 200px;
+}

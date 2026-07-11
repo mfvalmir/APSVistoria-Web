@@ -1,6 +1,6 @@
-import { chromium, type FullConfig } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
 import { createHmac } from "node:crypto";
-import { readFileSync, mkdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 function lerEnv(caminho: string): Record<string, string> {
@@ -33,24 +33,22 @@ function assinarJwt(payload: object, segredo: string): string {
   return `${headerCodificado}.${corpoCodificado}.${assinatura}`;
 }
 
-// Autentica a sessão de testes sem depender de credenciais reais: assina localmente
-// um JWT válido com o mesmo JWT_SECRET do backend (backend/.env) e injeta no localStorage.
-// Isso só funciona porque os testes rodam contra o ambiente de dev local.
-export default async function globalSetup(config: FullConfig) {
-  const envBackend = lerEnv(path.join(import.meta.dirname, "../../backend/.env"));
-  const token = assinarJwt(
-    { id: 1, idFuncionario: 999, nome: "DESENVOLVIMENTO", login: "DESENVOLVIMENTO", administrador: true },
-    envBackend.JWT_SECRET
-  );
+// A sessão vive em sessionStorage (não localStorage - ver App.tsx), então não dá pra
+// reaproveitar via `storageState` do Playwright, que só persiste localStorage/cookies.
+// Em vez disso, cada teste que usar este `test` já nasce com o token semeado via
+// addInitScript, que roda antes de qualquer script da página em toda navegação.
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    const envBackend = lerEnv(path.join(import.meta.dirname, "../../backend/.env"));
+    const token = assinarJwt(
+      { id: 1, idFuncionario: 999, nome: "DESENVOLVIMENTO", login: "DESENVOLVIMENTO", administrador: true },
+      envBackend.JWT_SECRET
+    );
+    await page.addInitScript((t) => {
+      window.sessionStorage.setItem("token", t);
+    }, token);
+    await use(page);
+  },
+});
 
-  const baseURL = config.projects[0].use.baseURL as string;
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  await page.goto(baseURL);
-  await page.evaluate((t) => localStorage.setItem("token", t), token);
-
-  const dirAuth = path.join(import.meta.dirname, ".auth");
-  mkdirSync(dirAuth, { recursive: true });
-  await page.context().storageState({ path: path.join(dirAuth, "storageState.json") });
-  await browser.close();
-}
+export { expect };

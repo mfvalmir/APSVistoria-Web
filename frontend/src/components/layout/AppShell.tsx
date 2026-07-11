@@ -15,6 +15,7 @@ interface AppShellProps {
     titulo: string;
     permissoes: ItemMenu["permissoes"] | null;
     navegarPara: (rota: string, nome: string, grupo: string) => void;
+    irParaInicio: () => void;
   }) => React.ReactNode;
 }
 
@@ -74,6 +75,7 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
           titulo: tituloAtual,
           permissoes: itemAtual?.permissoes || null,
           navegarPara: selecionarItem,
+          irParaInicio,
         })}
       </main>
     </div>

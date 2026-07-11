@@ -45,17 +45,18 @@
 }
 
 .app-header-versao {
-  font-size: 13px;
+  font-size: 15px;
   opacity: 0.75;
   white-space: nowrap;
 }
 
 .app-header-separator {
+  font-size: 18px;
   opacity: 0.5;
 }
 
 .app-header-grupo {
-  font-size: 16px;
+  font-size: 18px;
   opacity: 0.75;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -63,7 +64,7 @@
 }
 
 .app-header-titulo {
-  font-size: 16px;
+  font-size: 18px;
   opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -33,7 +33,7 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 
     const where = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
-    const result = await request.query(`${SELECT_BASE} ${where} ORDER BY u.Loginn`);
+    const result = await request.query(`${SELECT_BASE} ${where} ORDER BY u.IDUser DESC`);
     res.json(result.recordset);
   } catch (err) {
     console.error(err);

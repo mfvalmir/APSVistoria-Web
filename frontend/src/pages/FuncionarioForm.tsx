@@ -13,6 +13,7 @@ import {
   BairroOpcao,
 } from "../api/funcionarios";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { validarCPF } from "../utils/documento";
 import "./UsuarioForm.css";
 import "./FuncionarioForm.css";
 
@@ -147,6 +148,10 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
 
     if (!nomeFuncionario) {
       setErro("Informe o nome do funcionário");
+      return;
+    }
+    if (cpf && !validarCPF(cpf)) {
+      setErro("CPF inválido");
       return;
     }
 

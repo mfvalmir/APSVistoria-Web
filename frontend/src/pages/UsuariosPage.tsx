@@ -1,22 +1,34 @@
 import { useEffect, useState } from "react";
-import { Search, ShieldCheck, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { ArrowLeft, Search, X, ShieldCheck, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarUsuarios, desativarUsuario, Usuario } from "../api/usuarios";
 import { ItemMenu } from "../api/menu";
 import UsuarioForm from "./UsuarioForm";
 import UsuarioPerfil from "./UsuarioPerfil";
 import UsuarioSenha from "./UsuarioSenha";
+import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
 import "./UsuariosPage.css";
 
 type SubView = "lista" | "form" | "perfil" | "senha";
 
 const ITENS_POR_PAGINA = 15;
 
+const COLUNAS: OpcaoColuna[] = [
+  { chave: "id", label: "ID" },
+  { chave: "usuario", label: "Usuário" },
+  { chave: "funcionario", label: "Funcionário" },
+  { chave: "funcao", label: "Função" },
+  { chave: "status", label: "Status" },
+];
+const COLUNAS_PADRAO = ["usuario", "funcionario", "funcao", "status"];
+
 interface UsuariosPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
+  voltarInicio: () => void;
 }
 
-function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
+function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
@@ -29,6 +41,19 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<"A" | "I" | "">("A");
   const [pagina, setPagina] = useState(1);
+  const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
+    obterColunasVisiveis("usuarios", COLUNAS_PADRAO)
+  );
+
+  function alternarColuna(chave: string) {
+    setColunasVisiveis((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      salvarColunasVisiveis("usuarios", novo);
+      return novo;
+    });
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -104,6 +129,17 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   return (
     <div className="usuarios-page">
       <div className="usuarios-toolbar">
+        <button
+          type="button"
+          className="usuarios-btn-voltar"
+          title="Voltar para Início"
+          onClick={voltarInicio}
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <SeletorColunas colunas={COLUNAS} visiveis={colunasVisiveis} onToggle={alternarColuna} />
+
         <div className="usuarios-busca">
           <Search size={16} />
           <input
@@ -111,6 +147,16 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
+          {busca && (
+            <button
+              type="button"
+              className="usuarios-busca-limpar"
+              title="Limpar busca"
+              onClick={() => setBusca("")}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <select
@@ -136,35 +182,39 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
         <table className="usuarios-tabela">
           <thead>
             <tr>
-              <th>Usuário</th>
-              <th>Funcionário</th>
-              <th>Função</th>
-              <th className="usuarios-col-status">Status</th>
+              {colunasVisiveis.has("id") && <th>ID</th>}
+              {colunasVisiveis.has("usuario") && <th>Usuário</th>}
+              {colunasVisiveis.has("funcionario") && <th>Funcionário</th>}
+              {colunasVisiveis.has("funcao") && <th>Função</th>}
+              {colunasVisiveis.has("status") && <th className="usuarios-col-status">Status</th>}
               <th className="usuarios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 1} className="usuarios-vazio">Carregando...</td>
               </tr>
             ) : usuariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Nenhum usuário encontrado</td>
+                <td colSpan={colunasVisiveis.size + 1} className="usuarios-vazio">Nenhum usuário encontrado</td>
               </tr>
             ) : (
               usuariosPagina.map((u) => {
                 const ativo = u.Situacao.trim() === "A";
                 return (
                   <tr key={u.IDUser}>
-                    <td>{u.Loginn}</td>
-                    <td>{u.NomeFuncionario || "-"}</td>
-                    <td>{u.Funcao || "-"}</td>
-                    <td className="usuarios-col-status">
-                      <span className={`usuarios-badge ${ativo ? "ativo" : "inativo"}`}>
-                        {ativo ? "ATIVO" : "INATIVO"}
-                      </span>
-                    </td>
+                    {colunasVisiveis.has("id") && <td>{u.IDUser}</td>}
+                    {colunasVisiveis.has("usuario") && <td>{u.Loginn}</td>}
+                    {colunasVisiveis.has("funcionario") && <td>{u.NomeFuncionario || "-"}</td>}
+                    {colunasVisiveis.has("funcao") && <td>{u.Funcao || "-"}</td>}
+                    {colunasVisiveis.has("status") && (
+                      <td className="usuarios-col-status">
+                        <span className={`usuarios-badge ${ativo ? "ativo" : "inativo"}`}>
+                          {ativo ? "ATIVO" : "INATIVO"}
+                        </span>
+                      </td>
+                    )}
                     <td className="usuarios-col-acoes">
                       {administrador && (
                         <button

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool, sql } from "../db";
 import { authMiddleware } from "../middleware/auth";
+import { validarCPF } from "../utils/documento";
 
 const router = Router();
 
@@ -121,7 +122,7 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 
     const where = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
-    const result = await request.query(`${SELECT_BASE} ${where} ORDER BY f.NomeFuncionario`);
+    const result = await request.query(`${SELECT_BASE} ${where} ORDER BY f.IdFuncionario DESC`);
     res.json(result.recordset);
   } catch (err) {
     console.error(err);
@@ -172,6 +173,9 @@ router.post("/", authMiddleware, async (req, res) => {
   if (!nomeFuncionario) {
     return res.status(400).json({ erro: "nomeFuncionario é obrigatório" });
   }
+  if (cpf && !validarCPF(cpf)) {
+    return res.status(400).json({ erro: "CPF inválido" });
+  }
 
   try {
     const pool = await getPool();
@@ -192,7 +196,7 @@ router.post("/", authMiddleware, async (req, res) => {
       .input("idBanco", sql.Int, idBanco || null)
       .input("agencia", sql.VarChar, agencia || null)
       .input("numContaBanco", sql.VarChar, numContaBanco || null)
-      .input("cpf", sql.VarChar, cpf || null)
+      .input("cpf", sql.VarChar, cpf ? cpf.replace(/\D/g, "") : null)
       .input("chavePix", sql.VarChar, chavePix || null)
       .input("dataNascimento", sql.VarChar, dataNascimento || null)
       .input("observacao", sql.Text, observacao || null)
@@ -240,6 +244,9 @@ router.put("/:id", authMiddleware, async (req, res) => {
   if (!nomeFuncionario || !situacao) {
     return res.status(400).json({ erro: "nomeFuncionario e situacao são obrigatórios" });
   }
+  if (cpf && !validarCPF(cpf)) {
+    return res.status(400).json({ erro: "CPF inválido" });
+  }
 
   try {
     const pool = await getPool();
@@ -260,7 +267,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
       .input("idBanco", sql.Int, idBanco || null)
       .input("agencia", sql.VarChar, agencia || null)
       .input("numContaBanco", sql.VarChar, numContaBanco || null)
-      .input("cpf", sql.VarChar, cpf || null)
+      .input("cpf", sql.VarChar, cpf ? cpf.replace(/\D/g, "") : null)
       .input("chavePix", sql.VarChar, chavePix || null)
       .input("dataNascimento", sql.VarChar, dataNascimento || null)
       .input("observacao", sql.Text, observacao || null)

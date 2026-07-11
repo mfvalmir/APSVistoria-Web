@@ -1,21 +1,33 @@
 import { useEffect, useState } from "react";
-import { Search, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarFuncionarios, desativarFuncionario, Funcionario } from "../api/funcionarios";
 import { ItemMenu } from "../api/menu";
 import FuncionarioForm from "./FuncionarioForm";
+import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
 import "./FuncionariosPage.css";
 
 type SubView = "lista" | "form";
 
 const ITENS_POR_PAGINA = 15;
 
+const COLUNAS: OpcaoColuna[] = [
+  { chave: "id", label: "ID" },
+  { chave: "nome", label: "Nome" },
+  { chave: "funcao", label: "Função" },
+  { chave: "telefone", label: "Telefone" },
+  { chave: "status", label: "Status" },
+];
+const COLUNAS_PADRAO = ["nome", "funcao", "telefone", "status"];
+
 interface FuncionariosPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
   navegarPara: (rota: string, nome: string, grupo: string) => void;
+  voltarInicio: () => void;
 }
 
-function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
+function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: FuncionariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
@@ -28,6 +40,19 @@ function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<"A" | "I" | "">("A");
   const [pagina, setPagina] = useState(1);
+  const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
+    obterColunasVisiveis("funcionarios", COLUNAS_PADRAO)
+  );
+
+  function alternarColuna(chave: string) {
+    setColunasVisiveis((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      salvarColunasVisiveis("funcionarios", novo);
+      return novo;
+    });
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -84,6 +109,17 @@ function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
   return (
     <div className="funcionarios-page">
       <div className="funcionarios-toolbar">
+        <button
+          type="button"
+          className="funcionarios-btn-voltar"
+          title="Voltar para Início"
+          onClick={voltarInicio}
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <SeletorColunas colunas={COLUNAS} visiveis={colunasVisiveis} onToggle={alternarColuna} />
+
         <div className="funcionarios-busca">
           <Search size={16} />
           <input
@@ -91,6 +127,16 @@ function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
+          {busca && (
+            <button
+              type="button"
+              className="funcionarios-busca-limpar"
+              title="Limpar busca"
+              onClick={() => setBusca("")}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <select
@@ -116,35 +162,39 @@ function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
         <table className="funcionarios-tabela">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Função</th>
-              <th>Telefone</th>
-              <th className="funcionarios-col-status">Status</th>
+              {colunasVisiveis.has("id") && <th>ID</th>}
+              {colunasVisiveis.has("nome") && <th>Nome</th>}
+              {colunasVisiveis.has("funcao") && <th>Função</th>}
+              {colunasVisiveis.has("telefone") && <th>Telefone</th>}
+              {colunasVisiveis.has("status") && <th className="funcionarios-col-status">Status</th>}
               <th className="funcionarios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={5} className="funcionarios-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 1} className="funcionarios-vazio">Carregando...</td>
               </tr>
             ) : funcionariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={5} className="funcionarios-vazio">Nenhum funcionário encontrado</td>
+                <td colSpan={colunasVisiveis.size + 1} className="funcionarios-vazio">Nenhum funcionário encontrado</td>
               </tr>
             ) : (
               funcionariosPagina.map((f) => {
                 const ativo = f.Situacao.trim() === "A";
                 return (
                   <tr key={f.IdFuncionario}>
-                    <td>{f.NomeFuncionario}</td>
-                    <td>{f.Funcao || "-"}</td>
-                    <td>{f.TelCelular || f.TelResidencial || "-"}</td>
-                    <td className="funcionarios-col-status">
-                      <span className={`funcionarios-badge ${ativo ? "ativo" : "inativo"}`}>
-                        {ativo ? "ATIVO" : "INATIVO"}
-                      </span>
-                    </td>
+                    {colunasVisiveis.has("id") && <td>{f.IdFuncionario}</td>}
+                    {colunasVisiveis.has("nome") && <td>{f.NomeFuncionario}</td>}
+                    {colunasVisiveis.has("funcao") && <td>{f.Funcao || "-"}</td>}
+                    {colunasVisiveis.has("telefone") && <td>{f.TelCelular || f.TelResidencial || "-"}</td>}
+                    {colunasVisiveis.has("status") && (
+                      <td className="funcionarios-col-status">
+                        <span className={`funcionarios-badge ${ativo ? "ativo" : "inativo"}`}>
+                          {ativo ? "ATIVO" : "INATIVO"}
+                        </span>
+                      </td>
+                    )}
                     <td className="funcionarios-col-acoes">
                       {podeEditar && (
                         <button

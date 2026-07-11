@@ -14,9 +14,7 @@ interface SidebarProps {
 }
 
 function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }: SidebarProps) {
-  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
-    () => new Set(grupos.map((g) => g.grupo))
-  );
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(() => new Set());
   const [banco, setBanco] = useState("");
 
   useEffect(() => {
@@ -24,6 +22,14 @@ function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }
       .then((info) => setBanco(info.banco))
       .catch(() => setBanco(""));
   }, []);
+
+  // Toda vez que a página Início é acessada, o menu volta a ficar todo recolhido
+  // (pastas de grupo fechadas), em vez de manter a última árvore expandida.
+  useEffect(() => {
+    if (rotaAtual === null) {
+      setGruposExpandidos(new Set());
+    }
+  }, [rotaAtual]);
 
   function alternarGrupo(grupo: string) {
     setGruposExpandidos((atual) => {

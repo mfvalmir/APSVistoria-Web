@@ -11,6 +11,23 @@
   flex-wrap: wrap;
 }
 
+.usuarios-btn-voltar {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.usuarios-btn-voltar:hover {
+  background: var(--cor-fundo-hover);
+}
+
 .usuarios-busca {
   display: flex;
   align-items: center;
@@ -19,7 +36,7 @@
   border: 1px solid var(--cor-borda);
   border-radius: 8px;
   padding: 8px 12px;
-  min-width: 640px;
+  min-width: 480px;
   color: var(--cor-texto-fraco);
 }
 
@@ -30,6 +47,24 @@
   color: var(--cor-texto);
   font-size: 14px;
   width: 100%;
+}
+
+.usuarios-busca-limpar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--cor-texto-fraco);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.usuarios-busca-limpar:hover {
+  color: var(--cor-texto);
+  background: var(--cor-fundo-hover);
 }
 
 .usuarios-filtro-status {
