@@ -27,13 +27,17 @@ router.post("/login", async (req, res) => {
       );
 
     const user = result.recordset[0];
-    if (!user || user.Situacao.trim() !== "A") {
+    if (!user) {
       return res.status(401).json({ erro: "Usuário ou senha inválidos" });
     }
 
     const senhaCriptografada = criptografar(process.env.LEGACY_CRYPT_KEY as string, senha);
     if (senhaCriptografada !== user.Senha.trim().toLowerCase()) {
       return res.status(401).json({ erro: "Usuário ou senha inválidos" });
+    }
+
+    if (user.Situacao.trim() !== "A") {
+      return res.status(401).json({ erro: "Usuário inativo. Entre em contato com o administrador." });
     }
 
     const token = jwt.sign(

@@ -1,0 +1,21 @@
+.formulario-form-icone-linha {
+  display: flex;
+  gap: 8px;
+}
+
+.formulario-form-icone-linha select {
+  flex: 1;
+  min-width: 0;
+}
+
+.formulario-form-icone-preview {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  border: 1px solid var(--cor-borda-input);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-marca);
+  border-radius: 8px;
+}

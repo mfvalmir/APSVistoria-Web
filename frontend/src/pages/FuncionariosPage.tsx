@@ -1,22 +1,21 @@
 import { useEffect, useState } from "react";
-import { Search, ShieldCheck, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { listarUsuarios, desativarUsuario, Usuario } from "../api/usuarios";
+import { Search, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { listarFuncionarios, desativarFuncionario, Funcionario } from "../api/funcionarios";
 import { ItemMenu } from "../api/menu";
-import UsuarioForm from "./UsuarioForm";
-import UsuarioPerfil from "./UsuarioPerfil";
-import UsuarioSenha from "./UsuarioSenha";
-import "./UsuariosPage.css";
+import FuncionarioForm from "./FuncionarioForm";
+import "./FuncionariosPage.css";
 
-type SubView = "lista" | "form" | "perfil" | "senha";
+type SubView = "lista" | "form";
 
 const ITENS_POR_PAGINA = 15;
 
-interface UsuariosPageProps {
+interface FuncionariosPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
+  navegarPara: (rota: string, nome: string, grupo: string) => void;
 }
 
-function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
+function FuncionariosPage({ permissoes, navegarPara }: FuncionariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
@@ -24,7 +23,7 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<"A" | "I" | "">("A");
@@ -33,8 +32,8 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   async function carregar() {
     setCarregando(true);
     try {
-      const dados = await listarUsuarios(busca || undefined, status || undefined);
-      setUsuarios(dados);
+      const dados = await listarFuncionarios(busca || undefined, status || undefined);
+      setFuncionarios(dados);
     } finally {
       setCarregando(false);
     }
@@ -50,9 +49,9 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busca, status, subView]);
 
-  async function handleExcluir(usuario: Usuario) {
-    if (!window.confirm(`Desativar o usuário "${usuario.Loginn}"?`)) return;
-    await desativarUsuario(usuario.IDUser);
+  async function handleExcluir(funcionario: Funcionario) {
+    if (!window.confirm(`Desativar o funcionário "${funcionario.NomeFuncionario}"?`)) return;
+    await desativarFuncionario(funcionario.IdFuncionario);
     carregar();
   }
 
@@ -66,45 +65,26 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
     setSubView("form");
   }
 
-  function abrirPerfil(id: number) {
-    setIdSelecionado(id);
-    setSubView("perfil");
-  }
-
   function voltarParaLista() {
     setSubView("lista");
     carregar();
   }
 
   if (subView === "form") {
-    return (
-      <UsuarioForm
-        id={idSelecionado}
-        onVoltar={voltarParaLista}
-        onAlterarSenha={() => setSubView("senha")}
-      />
-    );
+    return <FuncionarioForm id={idSelecionado} onVoltar={voltarParaLista} navegarPara={navegarPara} />;
   }
 
-  if (subView === "senha" && idSelecionado !== null) {
-    return <UsuarioSenha id={idSelecionado} onVoltar={() => setSubView("form")} />;
-  }
-
-  if (subView === "perfil" && idSelecionado !== null) {
-    return <UsuarioPerfil usuarioId={idSelecionado} onVoltar={voltarParaLista} />;
-  }
-
-  const totalPaginas = Math.max(1, Math.ceil(usuarios.length / ITENS_POR_PAGINA));
+  const totalPaginas = Math.max(1, Math.ceil(funcionarios.length / ITENS_POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const usuariosPagina = usuarios.slice(
+  const funcionariosPagina = funcionarios.slice(
     (paginaAtual - 1) * ITENS_POR_PAGINA,
     paginaAtual * ITENS_POR_PAGINA
   );
 
   return (
-    <div className="usuarios-page">
-      <div className="usuarios-toolbar">
-        <div className="usuarios-busca">
+    <div className="funcionarios-page">
+      <div className="funcionarios-toolbar">
+        <div className="funcionarios-busca">
           <Search size={16} />
           <input
             placeholder="Buscar..."
@@ -114,7 +94,7 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
         </div>
 
         <select
-          className="usuarios-filtro-status"
+          className="funcionarios-filtro-status"
           value={status}
           onChange={(e) => setStatus(e.target.value as "A" | "I" | "")}
         >
@@ -123,72 +103,63 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
           <option value="">Todos</option>
         </select>
 
-        <div className="usuarios-toolbar-espaco" />
+        <div className="funcionarios-toolbar-espaco" />
 
         {podeAdicionar && (
-          <button className="usuarios-btn-criar" onClick={abrirCriacao}>
-            Criar Usuário
+          <button className="funcionarios-btn-criar" onClick={abrirCriacao}>
+            Criar Funcionário
           </button>
         )}
       </div>
 
-      <div className="usuarios-tabela-wrapper">
-        <table className="usuarios-tabela">
+      <div className="funcionarios-tabela-wrapper">
+        <table className="funcionarios-tabela">
           <thead>
             <tr>
-              <th>Usuário</th>
-              <th>Funcionário</th>
+              <th>Nome</th>
               <th>Função</th>
-              <th className="usuarios-col-status">Status</th>
-              <th className="usuarios-col-acoes">Ações</th>
+              <th>Telefone</th>
+              <th className="funcionarios-col-status">Status</th>
+              <th className="funcionarios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Carregando...</td>
+                <td colSpan={5} className="funcionarios-vazio">Carregando...</td>
               </tr>
-            ) : usuariosPagina.length === 0 ? (
+            ) : funcionariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Nenhum usuário encontrado</td>
+                <td colSpan={5} className="funcionarios-vazio">Nenhum funcionário encontrado</td>
               </tr>
             ) : (
-              usuariosPagina.map((u) => {
-                const ativo = u.Situacao.trim() === "A";
+              funcionariosPagina.map((f) => {
+                const ativo = f.Situacao.trim() === "A";
                 return (
-                  <tr key={u.IDUser}>
-                    <td>{u.Loginn}</td>
-                    <td>{u.NomeFuncionario || "-"}</td>
-                    <td>{u.Funcao || "-"}</td>
-                    <td className="usuarios-col-status">
-                      <span className={`usuarios-badge ${ativo ? "ativo" : "inativo"}`}>
+                  <tr key={f.IdFuncionario}>
+                    <td>{f.NomeFuncionario}</td>
+                    <td>{f.Funcao || "-"}</td>
+                    <td>{f.TelCelular || f.TelResidencial || "-"}</td>
+                    <td className="funcionarios-col-status">
+                      <span className={`funcionarios-badge ${ativo ? "ativo" : "inativo"}`}>
                         {ativo ? "ATIVO" : "INATIVO"}
                       </span>
                     </td>
-                    <td className="usuarios-col-acoes">
-                      {administrador && (
-                        <button
-                          className="usuarios-icone-acao perfil"
-                          title="Perfil de permissões"
-                          onClick={() => abrirPerfil(u.IDUser)}
-                        >
-                          <ShieldCheck size={16} />
-                        </button>
-                      )}
+                    <td className="funcionarios-col-acoes">
                       {podeEditar && (
                         <button
-                          className="usuarios-icone-acao editar"
+                          className="funcionarios-icone-acao editar"
                           title="Editar"
-                          onClick={() => abrirEdicao(u.IDUser)}
+                          onClick={() => abrirEdicao(f.IdFuncionario)}
                         >
                           <Pencil size={16} />
                         </button>
                       )}
                       {podeExcluir && (
                         <button
-                          className="usuarios-icone-acao perigo"
+                          className="funcionarios-icone-acao perigo"
                           title="Desativar"
-                          onClick={() => handleExcluir(u)}
+                          onClick={() => handleExcluir(f)}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -202,9 +173,9 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
         </table>
       </div>
 
-      <div className="usuarios-rodape">
-        <span>{usuarios.length} registros</span>
-        <div className="usuarios-paginacao">
+      <div className="funcionarios-rodape">
+        <span>{funcionarios.length} registros</span>
+        <div className="funcionarios-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />
           </button>
@@ -234,4 +205,4 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   );
 }
 
-export default UsuariosPage;
+export default FuncionariosPage;

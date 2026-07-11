@@ -1,22 +1,21 @@
 import { useEffect, useState } from "react";
-import { Search, ShieldCheck, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { listarUsuarios, desativarUsuario, Usuario } from "../api/usuarios";
+import { Search, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { listarFormularios, desativarFormulario, Formulario } from "../api/formularios";
 import { ItemMenu } from "../api/menu";
-import UsuarioForm from "./UsuarioForm";
-import UsuarioPerfil from "./UsuarioPerfil";
-import UsuarioSenha from "./UsuarioSenha";
-import "./UsuariosPage.css";
+import { getIcone } from "../components/iconRegistry";
+import FormularioForm from "./FormularioForm";
+import "./FormulariosPage.css";
 
-type SubView = "lista" | "form" | "perfil" | "senha";
+type SubView = "lista" | "form";
 
 const ITENS_POR_PAGINA = 15;
 
-interface UsuariosPageProps {
+interface FormulariosPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
 }
 
-function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
+function FormulariosPage({ permissoes }: FormulariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
@@ -24,7 +23,7 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [formularios, setFormularios] = useState<Formulario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<"A" | "I" | "">("A");
@@ -33,8 +32,8 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   async function carregar() {
     setCarregando(true);
     try {
-      const dados = await listarUsuarios(busca || undefined, status || undefined);
-      setUsuarios(dados);
+      const dados = await listarFormularios(busca || undefined, status || undefined);
+      setFormularios(dados);
     } finally {
       setCarregando(false);
     }
@@ -50,9 +49,9 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busca, status, subView]);
 
-  async function handleExcluir(usuario: Usuario) {
-    if (!window.confirm(`Desativar o usuário "${usuario.Loginn}"?`)) return;
-    await desativarUsuario(usuario.IDUser);
+  async function handleExcluir(formulario: Formulario) {
+    if (!window.confirm(`Desativar o formulário "${formulario.Descricao || formulario.NomeFormulario}"?`)) return;
+    await desativarFormulario(formulario.FormularioID);
     carregar();
   }
 
@@ -66,45 +65,26 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
     setSubView("form");
   }
 
-  function abrirPerfil(id: number) {
-    setIdSelecionado(id);
-    setSubView("perfil");
-  }
-
   function voltarParaLista() {
     setSubView("lista");
     carregar();
   }
 
   if (subView === "form") {
-    return (
-      <UsuarioForm
-        id={idSelecionado}
-        onVoltar={voltarParaLista}
-        onAlterarSenha={() => setSubView("senha")}
-      />
-    );
+    return <FormularioForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  if (subView === "senha" && idSelecionado !== null) {
-    return <UsuarioSenha id={idSelecionado} onVoltar={() => setSubView("form")} />;
-  }
-
-  if (subView === "perfil" && idSelecionado !== null) {
-    return <UsuarioPerfil usuarioId={idSelecionado} onVoltar={voltarParaLista} />;
-  }
-
-  const totalPaginas = Math.max(1, Math.ceil(usuarios.length / ITENS_POR_PAGINA));
+  const totalPaginas = Math.max(1, Math.ceil(formularios.length / ITENS_POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const usuariosPagina = usuarios.slice(
+  const formulariosPagina = formularios.slice(
     (paginaAtual - 1) * ITENS_POR_PAGINA,
     paginaAtual * ITENS_POR_PAGINA
   );
 
   return (
-    <div className="usuarios-page">
-      <div className="usuarios-toolbar">
-        <div className="usuarios-busca">
+    <div className="formularios-page">
+      <div className="formularios-toolbar">
+        <div className="formularios-busca">
           <Search size={16} />
           <input
             placeholder="Buscar..."
@@ -114,7 +94,7 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
         </div>
 
         <select
-          className="usuarios-filtro-status"
+          className="formularios-filtro-status"
           value={status}
           onChange={(e) => setStatus(e.target.value as "A" | "I" | "")}
         >
@@ -123,72 +103,67 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
           <option value="">Todos</option>
         </select>
 
-        <div className="usuarios-toolbar-espaco" />
+        <div className="formularios-toolbar-espaco" />
 
         {podeAdicionar && (
-          <button className="usuarios-btn-criar" onClick={abrirCriacao}>
-            Criar Usuário
+          <button className="formularios-btn-criar" onClick={abrirCriacao}>
+            Criar Formulário
           </button>
         )}
       </div>
 
-      <div className="usuarios-tabela-wrapper">
-        <table className="usuarios-tabela">
+      <div className="formularios-tabela-wrapper">
+        <table className="formularios-tabela">
           <thead>
             <tr>
-              <th>Usuário</th>
-              <th>Funcionário</th>
-              <th>Função</th>
-              <th className="usuarios-col-status">Status</th>
-              <th className="usuarios-col-acoes">Ações</th>
+              <th>Descrição</th>
+              <th>Nome</th>
+              <th>Grupo</th>
+              <th className="formularios-col-status">Status</th>
+              <th className="formularios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Carregando...</td>
+                <td colSpan={5} className="formularios-vazio">Carregando...</td>
               </tr>
-            ) : usuariosPagina.length === 0 ? (
+            ) : formulariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={5} className="usuarios-vazio">Nenhum usuário encontrado</td>
+                <td colSpan={5} className="formularios-vazio">Nenhum formulário encontrado</td>
               </tr>
             ) : (
-              usuariosPagina.map((u) => {
-                const ativo = u.Situacao.trim() === "A";
+              formulariosPagina.map((f) => {
+                const ativo = f.Ativo.trim() === "A";
+                const Icone = getIcone(f.Icone);
                 return (
-                  <tr key={u.IDUser}>
-                    <td>{u.Loginn}</td>
-                    <td>{u.NomeFuncionario || "-"}</td>
-                    <td>{u.Funcao || "-"}</td>
-                    <td className="usuarios-col-status">
-                      <span className={`usuarios-badge ${ativo ? "ativo" : "inativo"}`}>
+                  <tr key={f.FormularioID}>
+                    <td className="formularios-col-descricao">
+                      <Icone size={16} />
+                      {f.Descricao || "-"}
+                    </td>
+                    <td>{f.NomeFormulario}</td>
+                    <td>{f.Grupo || "-"}</td>
+                    <td className="formularios-col-status">
+                      <span className={`formularios-badge ${ativo ? "ativo" : "inativo"}`}>
                         {ativo ? "ATIVO" : "INATIVO"}
                       </span>
                     </td>
-                    <td className="usuarios-col-acoes">
-                      {administrador && (
-                        <button
-                          className="usuarios-icone-acao perfil"
-                          title="Perfil de permissões"
-                          onClick={() => abrirPerfil(u.IDUser)}
-                        >
-                          <ShieldCheck size={16} />
-                        </button>
-                      )}
+                    <td className="formularios-col-acoes">
                       {podeEditar && (
                         <button
-                          className="usuarios-icone-acao editar"
+                          className="formularios-icone-acao editar"
                           title="Editar"
-                          onClick={() => abrirEdicao(u.IDUser)}
+                          onClick={() => abrirEdicao(f.FormularioID)}
                         >
                           <Pencil size={16} />
                         </button>
                       )}
                       {podeExcluir && (
                         <button
-                          className="usuarios-icone-acao perigo"
+                          className="formularios-icone-acao perigo"
                           title="Desativar"
-                          onClick={() => handleExcluir(u)}
+                          onClick={() => handleExcluir(f)}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -202,9 +177,9 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
         </table>
       </div>
 
-      <div className="usuarios-rodape">
-        <span>{usuarios.length} registros</span>
-        <div className="usuarios-paginacao">
+      <div className="formularios-rodape">
+        <span>{formularios.length} registros</span>
+        <div className="formularios-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />
           </button>
@@ -234,4 +209,4 @@ function UsuariosPage({ permissoes, administrador }: UsuariosPageProps) {
   );
 }
 
-export default UsuariosPage;
+export default FormulariosPage;

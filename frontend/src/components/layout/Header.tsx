@@ -35,7 +35,7 @@ function Header({
         >
           <Menu size={20} />
         </button>
-        <span className="app-header-brand">APS Vistoria</span>
+        <img className="app-header-brand" src="/images/logo-aps-vistoria.png" alt="APS Vistoria" />
         <span className="app-header-versao">v{VERSAO_APP}</span>
         <span className="app-header-separator">/</span>
         {grupo && (
@@ -48,6 +48,11 @@ function Header({
       </div>
 
       <div className="app-header-right">
+        <span className="app-header-usuario">
+          <User size={16} />
+          {nomeUsuario}
+        </span>
+
         <button
           className="app-header-theme-btn"
           onClick={onAlternarTema}
@@ -56,11 +61,6 @@ function Header({
         >
           {tema === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-
-        <span className="app-header-usuario">
-          <User size={16} />
-          {nomeUsuario}
-        </span>
 
         <button
           className="app-header-logout"

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Folder, Home } from "lucide-react";
 import { GrupoMenu } from "../../api/menu";
+import { buscarInfoSistema } from "../../api/sistema";
 import { getIcone } from "../iconRegistry";
 import "./Sidebar.css";
 
@@ -16,6 +17,13 @@ function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     () => new Set(grupos.map((g) => g.grupo))
   );
+  const [banco, setBanco] = useState("");
+
+  useEffect(() => {
+    buscarInfoSistema()
+      .then((info) => setBanco(info.banco))
+      .catch(() => setBanco(""));
+  }, []);
 
   function alternarGrupo(grupo: string) {
     setGruposExpandidos((atual) => {
@@ -81,6 +89,12 @@ function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }
           );
         })}
       </ul>
+
+      <div className="app-sidebar-rodape">
+        <span>APS Vistoria &copy; {new Date().getFullYear()}</span>
+        {banco && <span>Banco de dados: {banco}</span>}
+        <span>Desenvolvido por Valmir Fco. Magalhães</span>
+      </div>
     </nav>
   );
 }

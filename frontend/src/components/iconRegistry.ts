@@ -44,3 +44,5 @@ export function getIcone(nome: string | null): LucideIcon {
   if (!nome) return Circle;
   return registro[nome] || Circle;
 }
+
+export const NOMES_ICONES = Object.keys(registro);

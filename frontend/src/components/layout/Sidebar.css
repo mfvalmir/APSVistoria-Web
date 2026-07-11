@@ -1,8 +1,9 @@
 .app-sidebar {
   grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
   background-color: var(--cor-fundo-secundario);
   border-right: 1px solid var(--cor-borda);
-  overflow-y: auto;
   width: 300px;
   transition: width 0.15s ease, opacity 0.15s ease;
 }
@@ -18,6 +19,22 @@
   list-style: none;
   margin: 0;
   padding: 8px 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.app-sidebar-rodape {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-sidebar-inicio-btn {

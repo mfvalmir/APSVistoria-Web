@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
-import Footer from "./Footer";
-import { buscarMenu, GrupoMenu } from "../../api/menu";
+import { buscarMenu, GrupoMenu, ItemMenu } from "../../api/menu";
 import { Tema } from "../../utils/theme";
 import "./AppShell.css";
 
@@ -11,7 +10,12 @@ interface AppShellProps {
   tema: Tema;
   onAlternarTema: () => void;
   onLogout: () => void;
-  children: (paginaAtual: { rota: string | null; titulo: string }) => React.ReactNode;
+  children: (paginaAtual: {
+    rota: string | null;
+    titulo: string;
+    permissoes: ItemMenu["permissoes"] | null;
+    navegarPara: (rota: string, nome: string, grupo: string) => void;
+  }) => React.ReactNode;
 }
 
 function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: AppShellProps) {
@@ -40,6 +44,8 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
     setGrupoAtual(null);
   }
 
+  const itemAtual = grupos.flatMap((g) => g.itens).find((item) => item.rota === rotaAtual) || null;
+
   return (
     <div className="app-shell">
       <Header
@@ -62,9 +68,14 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
         />
       )}
 
-      <main className="app-content">{children({ rota: rotaAtual, titulo: tituloAtual })}</main>
-
-      <Footer />
+      <main className="app-content">
+        {children({
+          rota: rotaAtual,
+          titulo: tituloAtual,
+          permissoes: itemAtual?.permissoes || null,
+          navegarPara: selecionarItem,
+        })}
+      </main>
     </div>
   );
 }

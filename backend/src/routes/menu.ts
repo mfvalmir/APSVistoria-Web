@@ -14,6 +14,9 @@ function paraRota(nomeFormulario: string): string {
 // GET /menu - árvore de navegação (Grupo -> Itens) com base nas permissões do usuário logado.
 // Administrador ('Administrador'='S') enxerga todas as telas ativas; os demais
 // só veem o que estiver liberado (AcessoFormulario=1) no perfil vinculado a ele em Permissoes/PermissoesItens.
+//
+// "Cadastro de Perfil de Usuários" (frmCadPermissoes) fica de fora do menu de propósito:
+// já é acessível como ação (ícone de escudo) dentro da listagem de Cadastro de Usuários.
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const pool = await getPool();
@@ -24,6 +27,7 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
                 CAST(1 AS BIT) AS PodeExcluir, CAST(1 AS BIT) AS PodeImprimir
          FROM Formularios
          WHERE Ativo = 'A'
+           AND NomeFormulario <> 'frmCadPermissoes'
          ORDER BY Grupo, Ordem, Descricao`
       : `SELECT f.FormularioID, f.NomeFormulario, f.Descricao, f.Grupo, f.Ordem, f.Icone,
                 pi.PodeAdicionar, pi.PodeEditar, pi.PodeExcluir, pi.PodeImprimir
@@ -33,6 +37,7 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
          WHERE p.UsuarioID = @usuarioId
            AND pi.AcessoFormulario = 1
            AND f.Ativo = 'A'
+           AND f.NomeFormulario <> 'frmCadPermissoes'
          ORDER BY f.Grupo, f.Ordem, f.Descricao`;
 
     const result = await pool.request().input("usuarioId", sql.Int, req.user!.id).query(query);

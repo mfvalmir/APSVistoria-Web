@@ -4,6 +4,9 @@ import "dotenv/config";
 import usuariosRouter from "./routes/usuarios";
 import authRouter from "./routes/auth";
 import menuRouter from "./routes/menu";
+import funcionariosRouter from "./routes/funcionarios";
+import formulariosRouter from "./routes/formularios";
+import permissoesRouter from "./routes/permissoes";
 
 const app = express();
 
@@ -18,8 +21,11 @@ app.use(
 );
 
 app.use("/usuarios", usuariosRouter);
+app.use("/usuarios", permissoesRouter);
 app.use("/auth", authRouter);
 app.use("/menu", menuRouter);
+app.use("/funcionarios", funcionariosRouter);
+app.use("/formularios", formulariosRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", banco: process.env.DB_NAME });
