@@ -1,11 +1,23 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { listarCaixas, excluirCaixa, Caixa } from "../api/caixa";
+import {
+  ArrowLeft,
+  Search,
+  X,
+  Pencil,
+  Trash2,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+  ChevronDown,
+} from "lucide-react";
+import { listarCaixas, excluirCaixa, obterCaixa, Caixa, MovimentoCaixa, ORIGEM_MOVIMENTO } from "../api/caixa";
 import { ItemMenu } from "../api/menu";
 import CaixaForm from "./CaixaForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import "./CaixaForm.css";
 import "./CaixaPage.css";
 
 type SubView = "lista" | "form";
@@ -48,6 +60,10 @@ function pad6(valor: number): string {
   return String(valor).padStart(6, "0");
 }
 
+function formatarDataHora(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR");
+}
+
 interface CaixaPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -73,6 +89,34 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("caixa", COLUNAS_PADRAO)
   );
+
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
+  const [movimentosPorCaixa, setMovimentosPorCaixa] = useState<Record<number, MovimentoCaixa[]>>({});
+  const [carregandoMovimentos, setCarregandoMovimentos] = useState<Set<number>>(new Set());
+
+  async function alternarExpandir(idCaixa: number) {
+    const estavaExpandido = expandidos.has(idCaixa);
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (estavaExpandido) novo.delete(idCaixa);
+      else novo.add(idCaixa);
+      return novo;
+    });
+
+    if (estavaExpandido || movimentosPorCaixa[idCaixa]) return;
+
+    setCarregandoMovimentos((atual) => new Set(atual).add(idCaixa));
+    try {
+      const dados = await obterCaixa(idCaixa);
+      setMovimentosPorCaixa((atual) => ({ ...atual, [idCaixa]: dados.movimentos }));
+    } finally {
+      setCarregandoMovimentos((atual) => {
+        const novo = new Set(atual);
+        novo.delete(idCaixa);
+        return novo;
+      });
+    }
+  }
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -202,6 +246,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
         <table className="caixa-tabela">
           <thead>
             <tr>
+              <th className="caixa-col-expandir"></th>
               {colunasVisiveis.has("id") && <th>Nº</th>}
               {colunasVisiveis.has("dataAbertura") && <th>Dt. Abertura</th>}
               {colunasVisiveis.has("saldoInicial") && <th className="caixa-col-valor">Saldo Inicial</th>}
@@ -216,22 +261,35 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="caixa-vazio">
+                <td colSpan={colunasVisiveis.size + 2} className="caixa-vazio">
                   Carregando...
                 </td>
               </tr>
             ) : caixasPagina.length === 0 ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="caixa-vazio">
+                <td colSpan={colunasVisiveis.size + 2} className="caixa-vazio">
                   Nenhum caixa encontrado
                 </td>
               </tr>
             ) : (
               caixasPagina.map((c) => {
                 const aberto = !c.DataFechamento;
+                const expandido = expandidos.has(c.idCaixa);
+                const movimentos = movimentosPorCaixa[c.idCaixa];
                 return (
-                  <tr key={c.idCaixa}>
-                    {colunasVisiveis.has("id") && <td>{pad6(c.idCaixa)}</td>}
+                  <Fragment key={c.idCaixa}>
+                    <tr>
+                      <td className="caixa-col-expandir">
+                        <button
+                          type="button"
+                          className={`caixa-btn-expandir ${expandido ? "aberto" : ""}`}
+                          title={expandido ? "Ocultar movimentos" : "Ver movimentos"}
+                          onClick={() => alternarExpandir(c.idCaixa)}
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </td>
+                      {colunasVisiveis.has("id") && <td>{pad6(c.idCaixa)}</td>}
                     {colunasVisiveis.has("dataAbertura") && <td>{formatarData(c.DataAbertura)}</td>}
                     {colunasVisiveis.has("saldoInicial") && (
                       <td className="caixa-col-valor">{formatarValor(c.SaldoInicial)}</td>
@@ -268,8 +326,59 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
                           <Trash2 size={16} />
                         </button>
                       )}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    {expandido && (
+                      <tr className="caixa-linha-expandida">
+                        <td colSpan={colunasVisiveis.size + 2} className="caixa-movimentos-celula">
+                          {carregandoMovimentos.has(c.idCaixa) ? (
+                            <div className="caixa-movimentos-estado">Carregando movimentos...</div>
+                          ) : !movimentos || movimentos.length === 0 ? (
+                            <div className="caixa-movimentos-estado">Nenhum movimento neste caixa.</div>
+                          ) : (
+                            <div className="caixa-form-movimentos-tabela-wrapper">
+                              <table className="caixa-form-movimentos-tabela">
+                                <thead>
+                                  <tr>
+                                    <th>Mov. Nº</th>
+                                    <th>Tipo</th>
+                                    <th>Data/Hora</th>
+                                    <th>Tipo Pgto.</th>
+                                    <th className="caixa-col-valor">Valor</th>
+                                    <th>Código</th>
+                                    <th>Origem</th>
+                                    <th>Descrição</th>
+                                    <th>Usuário</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {movimentos.map((m) => (
+                                    <tr key={m.idMovimento}>
+                                      <td>{pad6(m.idMovimento)}</td>
+                                      <td>
+                                        <span
+                                          className={`caixa-badge-tipo ${m.TipoMovimento === "E" ? "entrada" : "saida"}`}
+                                        >
+                                          {m.TipoMovimento === "E" ? "Entrada" : "Saída"}
+                                        </span>
+                                      </td>
+                                      <td>{formatarDataHora(m.DataHora)}</td>
+                                      <td>{m.DescricaoTipoPagamento || "-"}</td>
+                                      <td className="caixa-col-valor">{formatarValor(m.Valor)}</td>
+                                      <td>{m.idOrigem !== null ? pad6(m.idOrigem) : "-"}</td>
+                                      <td>{ORIGEM_MOVIMENTO[m.TipoOrigem] || "-"}</td>
+                                      <td className="caixa-form-movimentos-descricao">{m.Descricao || "-"}</td>
+                                      <td>{m.idusuario !== null ? pad6(m.idusuario) : "-"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })
             )}

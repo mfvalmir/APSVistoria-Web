@@ -98,7 +98,11 @@
   font-size: 13px;
 }
 
-.caixa-form-movimentos-tabela th {
+/* Seletores prefixados com "table" (em vez de só a classe) de propósito: essa tabela pode ficar
+   aninhada dentro de outra tabela (ex: linha expandida de CaixaPage), e um seletor descendente
+   genérico tipo ".caixa-tabela th" bate na mesma especificidade de ".caixa-form-movimentos-tabela th"
+   - o "table" extra garante que as regras daqui sempre vençam, não importa a ordem dos imports. */
+table.caixa-form-movimentos-tabela th {
   text-align: left;
   padding: 8px 10px;
   background: var(--cor-fundo-secundario);
@@ -110,7 +114,7 @@
   text-overflow: ellipsis;
 }
 
-.caixa-form-movimentos-tabela td {
+table.caixa-form-movimentos-tabela td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
@@ -119,55 +123,55 @@
   text-overflow: ellipsis;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(1),
-.caixa-form-movimentos-tabela td:nth-child(1) {
+table.caixa-form-movimentos-tabela th:nth-child(1),
+table.caixa-form-movimentos-tabela td:nth-child(1) {
   width: 78px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(2),
-.caixa-form-movimentos-tabela td:nth-child(2) {
+table.caixa-form-movimentos-tabela th:nth-child(2),
+table.caixa-form-movimentos-tabela td:nth-child(2) {
   width: 75px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(3),
-.caixa-form-movimentos-tabela td:nth-child(3) {
-  width: 150px;
+table.caixa-form-movimentos-tabela th:nth-child(3),
+table.caixa-form-movimentos-tabela td:nth-child(3) {
+  width: 165px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(4),
-.caixa-form-movimentos-tabela td:nth-child(4) {
-  width: 130px;
+table.caixa-form-movimentos-tabela th:nth-child(4),
+table.caixa-form-movimentos-tabela td:nth-child(4) {
+  width: 145px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(5),
-.caixa-form-movimentos-tabela td:nth-child(5) {
+table.caixa-form-movimentos-tabela th:nth-child(5),
+table.caixa-form-movimentos-tabela td:nth-child(5) {
   width: 90px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(6),
-.caixa-form-movimentos-tabela td:nth-child(6) {
-  width: 65px;
+table.caixa-form-movimentos-tabela th:nth-child(6),
+table.caixa-form-movimentos-tabela td:nth-child(6) {
+  width: 80px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(7),
-.caixa-form-movimentos-tabela td:nth-child(7) {
-  width: 120px;
+table.caixa-form-movimentos-tabela th:nth-child(7),
+table.caixa-form-movimentos-tabela td:nth-child(7) {
+  width: 140px;
 }
 
-.caixa-form-movimentos-tabela th:nth-child(9),
-.caixa-form-movimentos-tabela td:nth-child(9) {
+table.caixa-form-movimentos-tabela th:nth-child(9),
+table.caixa-form-movimentos-tabela td:nth-child(9) {
   width: 75px;
 }
 
-.caixa-form-movimentos-tabela tbody tr:last-child td {
+table.caixa-form-movimentos-tabela tbody tr:last-child td {
   border-bottom: none;
 }
 
-.caixa-form-movimentos-tabela tbody tr:nth-child(even) {
+table.caixa-form-movimentos-tabela tbody tr:nth-child(even) {
   background: var(--cor-fundo-secundario);
 }
 
-.caixa-form-movimentos-tabela td.caixa-form-movimentos-descricao {
+table.caixa-form-movimentos-tabela td.caixa-form-movimentos-descricao {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
