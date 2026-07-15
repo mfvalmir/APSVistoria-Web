@@ -11,6 +11,8 @@ import {
   ChevronRight,
   ChevronsRight,
   ChevronDown,
+  Banknote,
+  Undo2,
 } from "lucide-react";
 import {
   listarContasReceber,
@@ -22,6 +24,8 @@ import {
 } from "../api/contaReceber";
 import { ItemMenu } from "../api/menu";
 import ContaReceberForm from "./ContaReceberForm";
+import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
+import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
 import "./ContaReceberForm.css";
@@ -70,6 +74,10 @@ function pad3(valor: number): string {
   return String(valor).padStart(3, "0");
 }
 
+function parcelaPaga(p: ParcelaContaReceber): boolean {
+  return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
+}
+
 interface ContaReceberPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -81,6 +89,8 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeBaixarParcela = permissoes?.baixarParCR ?? false;
+  const podeEstornarParcela = permissoes?.estornarParCR ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -97,6 +107,14 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const [parcelasPorConta, setParcelasPorConta] = useState<Record<number, ParcelaContaReceber[]>>({});
   const [carregandoParcelas, setCarregandoParcelas] = useState<Set<number>>(new Set());
+  const [parcelaEmBaixa, setParcelaEmBaixa] = useState<{
+    idContaReceber: number;
+    parcela: ParcelaContaReceber;
+  } | null>(null);
+  const [parcelaEmEstorno, setParcelaEmEstorno] = useState<{
+    idContaReceber: number;
+    parcela: ParcelaContaReceber;
+  } | null>(null);
 
   async function alternarExpandir(idContaReceber: number) {
     const estavaExpandido = expandidos.has(idContaReceber);
@@ -120,6 +138,34 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
         return novo;
       });
     }
+  }
+
+  // Recarrega só a conta afetada (parcelas expandidas + status/saldo devedor do cabeçalho na
+  // linha da lista) depois de uma baixa/estorno, sem precisar recarregar a lista inteira.
+  async function atualizarConta(idContaReceber: number) {
+    const dados = await obterContaReceber(idContaReceber);
+    setParcelasPorConta((atual) => ({ ...atual, [idContaReceber]: dados.parcelas }));
+    setContas((atual) =>
+      atual.map((c) =>
+        c.IdContaReceber === idContaReceber
+          ? { ...c, IdStatusContaReceber: dados.IdStatusContaReceber, SaldoDevedor: dados.SaldoDevedor }
+          : c
+      )
+    );
+  }
+
+  async function handleParcelaBaixada() {
+    if (!parcelaEmBaixa) return;
+    const { idContaReceber } = parcelaEmBaixa;
+    setParcelaEmBaixa(null);
+    await atualizarConta(idContaReceber);
+  }
+
+  async function handleParcelaEstornada() {
+    if (!parcelaEmEstorno) return;
+    const { idContaReceber } = parcelaEmEstorno;
+    setParcelaEmEstorno(null);
+    await atualizarConta(idContaReceber);
   }
 
   function alternarColuna(chave: string) {
@@ -355,11 +401,15 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
                                   <th>Data Pagamento</th>
                                   <th>Tipo Pagamento</th>
                                   <th>Status</th>
+                                  {(podeBaixarParcela || podeEstornarParcela) && (
+                                    <th className="conta-receber-col-acoes">Ações</th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody>
                                 {parcelas.map((p) => {
                                   const infoParcela = statusInfo(p.IdStatusParcela);
+                                  const paga = parcelaPaga(p);
                                   return (
                                     <tr key={p.IdContaReceberParcela}>
                                       <td>{pad3(p.NumeroParcela)}</td>
@@ -373,6 +423,34 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
                                           {infoParcela.label.toUpperCase()}
                                         </span>
                                       </td>
+                                      {(podeBaixarParcela || podeEstornarParcela) && (
+                                        <td className="conta-receber-col-acoes">
+                                          {podeBaixarParcela && !paga && (
+                                            <button
+                                              type="button"
+                                              className="conta-receber-icone-acao"
+                                              title="Dar baixa nesta parcela"
+                                              onClick={() =>
+                                                setParcelaEmBaixa({ idContaReceber: c.IdContaReceber, parcela: p })
+                                              }
+                                            >
+                                              <Banknote size={16} />
+                                            </button>
+                                          )}
+                                          {podeEstornarParcela && paga && (
+                                            <button
+                                              type="button"
+                                              className="conta-receber-icone-acao estorno"
+                                              title="Estornar a baixa desta parcela"
+                                              onClick={() =>
+                                                setParcelaEmEstorno({ idContaReceber: c.IdContaReceber, parcela: p })
+                                              }
+                                            >
+                                              <Undo2 size={16} />
+                                            </button>
+                                          )}
+                                        </td>
+                                      )}
                                     </tr>
                                   );
                                 })}
@@ -415,6 +493,24 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
           </button>
         </div>
       </div>
+
+      {parcelaEmBaixa && (
+        <ContaReceberBaixaModal
+          idContaReceber={parcelaEmBaixa.idContaReceber}
+          parcela={parcelaEmBaixa.parcela}
+          onCancelar={() => setParcelaEmBaixa(null)}
+          onBaixada={handleParcelaBaixada}
+        />
+      )}
+
+      {parcelaEmEstorno && (
+        <ContaReceberEstornoModal
+          idContaReceber={parcelaEmEstorno.idContaReceber}
+          parcela={parcelaEmEstorno.parcela}
+          onCancelar={() => setParcelaEmEstorno(null)}
+          onEstornada={handleParcelaEstornada}
+        />
+      )}
     </div>
   );
 }
