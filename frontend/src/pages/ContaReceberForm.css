@@ -1,0 +1,139 @@
+.conta-receber-form-textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cor-borda-input);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+.conta-receber-form-textarea:focus {
+  border-color: var(--cor-marca);
+}
+
+.conta-receber-form-campo-documento {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+.conta-receber-form-campo-categoria-larga {
+  flex: 0 0 600px;
+  min-width: 600px;
+}
+
+.conta-receber-form-campo-tipo-pagamento {
+  flex: 0 0 240px;
+  min-width: 240px;
+}
+
+.conta-receber-form-campo-valor {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+.conta-receber-form-campo-data {
+  flex: 0 0 170px;
+  min-width: 170px;
+}
+
+.conta-receber-form-campo-numero {
+  flex: 0 0 150px;
+  min-width: 150px;
+}
+
+.conta-receber-form-campo-status {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+.usuario-form-campo input.conta-receber-form-status-select:disabled {
+  opacity: 1;
+  font-weight: 700;
+  text-align: center;
+  cursor: default;
+}
+
+.conta-receber-form-status-select.pendente {
+  background: #c8860d22;
+  border-color: #c8860d55;
+  color: #c8860d;
+}
+
+.conta-receber-form-status-select.pago {
+  background: #1e7d3222;
+  border-color: #2f9e4655;
+  color: #2f9e46;
+}
+
+.conta-receber-form-status-select.parcial {
+  background: #1c6fb022;
+  border-color: #2f8fd955;
+  color: #2f8fd9;
+}
+
+.conta-receber-form-status-select.cancelado {
+  background: #a33a2c22;
+  border-color: #a33a2c55;
+  color: var(--cor-erro);
+}
+
+.conta-receber-form-campo-recalcular {
+  flex: 1 1 260px;
+  min-width: 260px;
+  justify-content: center;
+}
+
+.conta-receber-form-dica {
+  font-size: 12px;
+  color: var(--cor-texto-fraco);
+}
+
+.conta-receber-form-parcelas {
+  border-top: 1px solid var(--cor-borda);
+  padding-top: 16px;
+}
+
+.conta-receber-form-parcelas h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--cor-texto-titulo);
+}
+
+.conta-receber-form-parcelas-tabela-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+}
+
+.conta-receber-form-parcelas-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.conta-receber-form-parcelas-tabela th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto-titulo);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cor-borda);
+  white-space: nowrap;
+}
+
+.conta-receber-form-parcelas-tabela td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+.conta-receber-form-parcelas-tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.conta-receber-form-parcelas-tabela tbody tr:nth-child(even) {
+  background: var(--cor-fundo-secundario);
+}

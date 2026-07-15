@@ -14,6 +14,8 @@ import ServicoPage from "./pages/ServicoPage";
 import TipoPagamentoPage from "./pages/TipoPagamentoPage";
 import FornecedorPage from "./pages/FornecedorPage";
 import ContaPagarPage from "./pages/ContaPagarPage";
+import ContaReceberPage from "./pages/ContaReceberPage";
+import CaixaPage from "./pages/CaixaPage";
 import Placeholder from "./pages/Placeholder";
 import Inicio from "./pages/Inicio";
 import { decodeToken } from "./utils/jwt";
@@ -189,6 +191,26 @@ function App() {
         if (rota === "conta-pagar") {
           return (
             <ContaPagarPage
+              permissoes={permissoes}
+              administrador={administradorLogado()}
+              navegarPara={navegarPara}
+              voltarInicio={irParaInicio}
+            />
+          );
+        }
+        if (rota === "conta-receber") {
+          return (
+            <ContaReceberPage
+              permissoes={permissoes}
+              administrador={administradorLogado()}
+              navegarPara={navegarPara}
+              voltarInicio={irParaInicio}
+            />
+          );
+        }
+        if (rota === "caixa") {
+          return (
+            <CaixaPage
               permissoes={permissoes}
               administrador={administradorLogado()}
               navegarPara={navegarPara}

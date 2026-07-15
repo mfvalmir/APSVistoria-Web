@@ -14,6 +14,17 @@ export async function listarTiposPagamento(busca?: string): Promise<TipoPagament
   return data;
 }
 
+// "Retorno" e "Cortesia" são tipos usados só em Vistoria - não fazem sentido como forma de
+// pagamento em Conta a Pagar/Receber, então ficam de fora desses dois fluxos.
+const TIPOS_OCULTOS_EM_CONTA_PAGAR_RECEBER = ["retorno", "cortesia"];
+
+export async function listarTiposPagamentoPadrao(): Promise<TipoPagamento[]> {
+  const tipos = await listarTiposPagamento();
+  return tipos.filter(
+    (t) => !TIPOS_OCULTOS_EM_CONTA_PAGAR_RECEBER.includes(t.DescricaoTipoPagamento.trim().toLowerCase())
+  );
+}
+
 export async function obterTipoPagamento(id: number): Promise<TipoPagamento> {
   const { data } = await api.get<TipoPagamento>(`/tipo-pagamento/${id}`);
   return data;

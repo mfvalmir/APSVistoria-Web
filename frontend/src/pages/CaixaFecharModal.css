@@ -1,0 +1,65 @@
+.caixa-fechar-form {
+  border: none;
+  padding: 0;
+  gap: 16px;
+}
+
+.caixa-fechar-acoes {
+  display: flex;
+  gap: 12px;
+}
+
+.caixa-fechar-btn-salvar,
+.caixa-fechar-btn-cancelar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.caixa-fechar-btn-salvar {
+  background: #2f9e46;
+  color: #f2ede8;
+}
+
+.caixa-fechar-btn-salvar:hover:not(:disabled) {
+  background: #278238;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.caixa-fechar-btn-cancelar {
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+.caixa-fechar-btn-cancelar:hover:not(:disabled) {
+  background: var(--cor-fundo-hover);
+}
+
+.caixa-fechar-btn-salvar:disabled,
+.caixa-fechar-btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.caixa-fechar-atalho {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.caixa-fechar-aviso {
+  margin: 0;
+  font-size: 14px;
+  color: var(--cor-texto);
+  line-height: 1.5;
+}

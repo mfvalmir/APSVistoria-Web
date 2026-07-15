@@ -2,23 +2,23 @@ import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { ArrowLeft, ExternalLink, Send, Banknote, Undo2 } from "lucide-react";
 import {
-  obterContaPagar,
-  criarContaPagar,
-  atualizarContaPagar,
-  STATUS_CONTA_PAGAR,
-  ParcelaContaPagar,
-} from "../api/contaPagar";
-import { listarFornecedores, Fornecedor } from "../api/fornecedores";
+  obterContaReceber,
+  criarContaReceber,
+  atualizarContaReceber,
+  STATUS_CONTA_RECEBER,
+  ParcelaContaReceber,
+} from "../api/contaReceber";
+import { listarClientes, Cliente } from "../api/clientes";
 import { listarCategorias, Categoria } from "../api/categoria";
 import { listarTiposPagamentoPadrao, TipoPagamento } from "../api/tipoPagamento";
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { ItemMenu } from "../api/menu";
-import ContaPagarBaixaModal from "./ContaPagarBaixaModal";
-import ContaPagarEstornoModal from "./ContaPagarEstornoModal";
+import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
+import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
 import "./UsuarioForm.css";
-import "./ContaPagarForm.css";
+import "./ContaReceberForm.css";
 
-interface ContaPagarFormProps {
+interface ContaReceberFormProps {
   id: number | null;
   onVoltar: () => void;
   navegarPara?: (rota: string, nome: string, grupo: string) => void;
@@ -52,7 +52,7 @@ function moedaParaNumero(valor: string): number {
 }
 
 function statusParcelaInfo(idStatus: number): { label: string; classe: string } {
-  const item = STATUS_CONTA_PAGAR.find((s) => s.valor === idStatus);
+  const item = STATUS_CONTA_RECEBER.find((s) => s.valor === idStatus);
   const classes: Record<number, string> = { 0: "pendente", 1: "pago", 2: "parcial", 3: "cancelado" };
   return { label: item?.label ?? "-", classe: classes[idStatus] ?? "pendente" };
 }
@@ -61,46 +61,46 @@ function pad3(valor: number): string {
   return String(valor).padStart(3, "0");
 }
 
-function parcelaPaga(p: ParcelaContaPagar): boolean {
+function parcelaPaga(p: ParcelaContaReceber): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
-function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFormProps) {
+function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaReceberFormProps) {
   const modoEdicao = id !== null;
 
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [idFornecedor, setIdFornecedor] = useState<number | null>(null);
-  const [nomeFornecedor, setNomeFornecedor] = useState("");
+  const [idCliente, setIdCliente] = useState<number | null>(null);
+  const [nomeCliente, setNomeCliente] = useState("");
   const [idCategoria, setIdCategoria] = useState<number | null>(null);
   const [valorTotal, setValorTotal] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [primeiroVencimento, setPrimeiroVencimento] = useState("");
   const [idPrimeiroTipoPagamento, setIdPrimeiroTipoPagamento] = useState<number | null>(null);
   const [intervaloMeses, setIntervaloMeses] = useState("1");
-  const [idStatusContaPagar, setIdStatusContaPagar] = useState(0);
+  const [idStatusContaReceber, setIdStatusContaReceber] = useState(0);
   const [dataEmissao, setDataEmissao] = useState(hoje());
   const [observacao, setObservacao] = useState("");
   const [recalcularParcelas, setRecalcularParcelas] = useState(false);
 
   const [saldoDevedor, setSaldoDevedor] = useState<number | null>(null);
-  const [parcelas, setParcelas] = useState<ParcelaContaPagar[]>([]);
+  const [parcelas, setParcelas] = useState<ParcelaContaReceber[]>([]);
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [tiposPagamento, setTiposPagamento] = useState<TipoPagamento[]>([]);
-  const [sugestoesFornecedor, setSugestoesFornecedor] = useState<Fornecedor[]>([]);
-  const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
+  const [sugestoesCliente, setSugestoesCliente] = useState<Cliente[]>([]);
+  const [mostrarSugestoesCliente, setMostrarSugestoesCliente] = useState(false);
 
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaContaPagar | null>(null);
-  const [parcelaEmEstorno, setParcelaEmEstorno] = useState<ParcelaContaPagar | null>(null);
+  const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaContaReceber | null>(null);
+  const [parcelaEmEstorno, setParcelaEmEstorno] = useState<ParcelaContaReceber | null>(null);
 
   const algumaParcelaPaga = parcelas.some(parcelaPaga);
-  const podeBaixarParcela = permissoes?.baixarParCP ?? false;
-  const podeEstornarParcela = permissoes?.estornarParCP ?? false;
+  const podeBaixarParcela = permissoes?.baixarParCR ?? false;
+  const podeEstornarParcela = permissoes?.estornarParCR ?? false;
 
   useEffect(() => {
     listarCategorias().then(setCategorias);
@@ -109,18 +109,18 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
 
   async function carregarConta() {
     if (id === null) return;
-    const c = await obterContaPagar(id);
+    const c = await obterContaReceber(id);
     setNumeroDocumento(c.NumeroDocumento || "");
     setDescricao(c.Descricao);
-    setIdFornecedor(c.idFornecedor);
-    setNomeFornecedor(c.RazaoSocial || "");
+    setIdCliente(c.idCliente);
+    setNomeCliente(c.NomeCliente || "");
     setIdCategoria(c.idCategoria);
     setValorTotal(numeroParaMoeda(c.ValorTotal));
     setTotalParcelas(String(c.TotalParcelas));
     setPrimeiroVencimento(paraInputDate(c.DataPrimeiraParcela));
     setIdPrimeiroTipoPagamento(c.IdPrimeiroTipoPagamento);
     setIntervaloMeses(String(c.IntervaloMeses ?? 1));
-    setIdStatusContaPagar(c.IdStatusContaPagar);
+    setIdStatusContaReceber(c.IdStatusContaReceber);
     setDataEmissao(paraInputDate(c.DataEmissao));
     setObservacao(c.Observacao || "");
     setSaldoDevedor(c.SaldoDevedor);
@@ -144,21 +144,21 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
   }
 
   useEffect(() => {
-    if (!nomeFornecedor || (idFornecedor && nomeFornecedor === "")) {
-      setSugestoesFornecedor([]);
+    if (!nomeCliente || (idCliente && nomeCliente === "")) {
+      setSugestoesCliente([]);
       return;
     }
     const timeout = setTimeout(() => {
-      listarFornecedores(nomeFornecedor, "A").then(setSugestoesFornecedor);
+      listarClientes(nomeCliente).then(setSugestoesCliente);
     }, 250);
     return () => clearTimeout(timeout);
-  }, [nomeFornecedor, idFornecedor]);
+  }, [nomeCliente, idCliente]);
 
-  function selecionarFornecedor(f: Fornecedor) {
-    setIdFornecedor(f.idFornecedor);
-    setNomeFornecedor(f.RazaoSocial);
-    setSugestoesFornecedor([]);
-    setMostrarSugestoesFornecedor(false);
+  function selecionarCliente(c: Cliente) {
+    setIdCliente(c.idCliente);
+    setNomeCliente(c.NomeCliente);
+    setSugestoesCliente([]);
+    setMostrarSugestoesCliente(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -183,14 +183,14 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
     const dados = {
       numeroDocumento: numeroDocumento || undefined,
       descricao,
-      idFornecedor: idFornecedor ?? undefined,
+      idCliente: idCliente ?? undefined,
       idCategoria,
       valorTotal: valor,
       totalParcelas: parcelasNum,
       primeiroVencimento: primeiroVencimento || undefined,
       idPrimeiroTipoPagamento: idPrimeiroTipoPagamento ?? undefined,
       intervaloMeses: intervaloMeses ? Number(intervaloMeses) : undefined,
-      idStatusContaPagar,
+      idStatusContaReceber,
       dataEmissao,
       observacao: observacao || undefined,
     };
@@ -198,14 +198,17 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
     setSalvando(true);
     try {
       if (modoEdicao && id !== null) {
-        await atualizarContaPagar(id, { ...dados, recalcularParcelas: algumaParcelaPaga ? false : recalcularParcelas });
+        await atualizarContaReceber(id, {
+          ...dados,
+          recalcularParcelas: algumaParcelaPaga ? false : recalcularParcelas,
+        });
       } else {
-        await criarContaPagar(dados);
+        await criarContaReceber(dados);
       }
       onVoltar();
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        setErro(err.response.data?.erro || "Não foi possível salvar a conta a pagar");
+        setErro(err.response.data?.erro || "Não foi possível salvar a conta a receber");
       } else {
         setErro("Não foi possível conectar ao servidor. Tente novamente.");
       }
@@ -224,15 +227,15 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         <button className="usuario-form-voltar" onClick={onVoltar} type="button">
           <ArrowLeft size={18} />
         </button>
-        <h2>{modoEdicao ? "Editar Conta a Pagar" : "Nova Conta a Pagar"}</h2>
+        <h2>{modoEdicao ? "Editar Conta a Receber" : "Nova Conta a Receber"}</h2>
       </div>
 
       <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-pagar-form-campo-documento">
-            <label htmlFor="cp-numero-documento">Nº Documento</label>
+          <div className="usuario-form-campo conta-receber-form-campo-documento">
+            <label htmlFor="cr-numero-documento">Nº Documento</label>
             <input
-              id="cp-numero-documento"
+              id="cr-numero-documento"
               value={numeroDocumento}
               onChange={(e) => setNumeroDocumento(e.target.value)}
               placeholder="Nº do documento"
@@ -240,12 +243,12 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-data">
-            <label htmlFor="cp-data-emissao">
+          <div className="usuario-form-campo conta-receber-form-campo-data">
+            <label htmlFor="cr-data-emissao">
               Data de Emissão <span className="obrigatorio">*</span>
             </label>
             <input
-              id="cp-data-emissao"
+              id="cr-data-emissao"
               type="date"
               value={dataEmissao}
               onChange={(e) => setDataEmissao(e.target.value)}
@@ -254,11 +257,11 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
           </div>
 
           <div className="usuario-form-campo">
-            <label htmlFor="cp-descricao">
+            <label htmlFor="cr-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
-              id="cp-descricao"
+              id="cr-descricao"
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               placeholder="Digite a descrição"
@@ -267,12 +270,12 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-status">
-            <label htmlFor="cp-status">Status</label>
+          <div className="usuario-form-campo conta-receber-form-campo-status">
+            <label htmlFor="cr-status">Status</label>
             <input
-              id="cp-status"
-              className={`conta-pagar-form-status-select ${statusParcelaInfo(idStatusContaPagar).classe}`}
-              value={statusParcelaInfo(idStatusContaPagar).label}
+              id="cr-status"
+              className={`conta-receber-form-status-select ${statusParcelaInfo(idStatusContaReceber).classe}`}
+              value={statusParcelaInfo(idStatusContaReceber).label}
               disabled
               readOnly
               title="Definido automaticamente pelo sistema, conforme a situação das parcelas"
@@ -282,48 +285,48 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
 
         <div className="usuario-form-linha">
           <div className="usuario-form-campo usuario-form-combobox">
-            <label htmlFor="cp-fornecedor">Fornecedor</label>
+            <label htmlFor="cr-cliente">Cliente</label>
             <div className="usuario-form-campo-com-acao">
               <input
-                id="cp-fornecedor"
-                value={nomeFornecedor}
+                id="cr-cliente"
+                value={nomeCliente}
                 onChange={(e) => {
-                  setNomeFornecedor(e.target.value);
-                  setIdFornecedor(null);
-                  setMostrarSugestoesFornecedor(true);
+                  setNomeCliente(e.target.value);
+                  setIdCliente(null);
+                  setMostrarSugestoesCliente(true);
                 }}
-                onFocus={() => setMostrarSugestoesFornecedor(true)}
-                onBlur={() => setTimeout(() => setMostrarSugestoesFornecedor(false), 150)}
-                placeholder="Digite para buscar o fornecedor..."
+                onFocus={() => setMostrarSugestoesCliente(true)}
+                onBlur={() => setTimeout(() => setMostrarSugestoesCliente(false), 150)}
+                placeholder="Digite para buscar o cliente..."
                 autoComplete="off"
               />
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Fornecedores"
-                onClick={() => navegarPara?.("fornecedor", "Cadastro de Fornecedores", "Cadastros")}
+                title="Ir para Cadastro de Clientes"
+                onClick={() => navegarPara?.("clientes", "Cadastro de Clientes", "Cadastros")}
               >
                 <ExternalLink size={16} />
               </button>
             </div>
-            {mostrarSugestoesFornecedor && sugestoesFornecedor.length > 0 && (
+            {mostrarSugestoesCliente && sugestoesCliente.length > 0 && (
               <ul className="usuario-form-sugestoes">
-                {sugestoesFornecedor.map((f) => (
-                  <li key={f.idFornecedor} onMouseDown={() => selecionarFornecedor(f)}>
-                    {f.RazaoSocial}
+                {sugestoesCliente.map((c) => (
+                  <li key={c.idCliente} onMouseDown={() => selecionarCliente(c)}>
+                    {c.NomeCliente}
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-categoria-larga">
-            <label htmlFor="cp-categoria">
+          <div className="usuario-form-campo conta-receber-form-campo-categoria-larga">
+            <label htmlFor="cr-categoria">
               Categoria <span className="obrigatorio">*</span>
             </label>
             <div className="usuario-form-campo-com-acao">
               <select
-                id="cp-categoria"
+                id="cr-categoria"
                 value={idCategoria ?? ""}
                 onChange={(e) => setIdCategoria(e.target.value ? Number(e.target.value) : null)}
                 required
@@ -348,12 +351,12 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-pagar-form-campo-valor">
-            <label htmlFor="cp-valor-total">
+          <div className="usuario-form-campo conta-receber-form-campo-valor">
+            <label htmlFor="cr-valor-total">
               Valor Total <span className="obrigatorio">*</span>
             </label>
             <input
-              id="cp-valor-total"
+              id="cr-valor-total"
               value={valorTotal}
               onChange={(e) => setValorTotal(formatarMoeda(e.target.value))}
               placeholder="R$ 0,00"
@@ -362,12 +365,12 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-numero">
-            <label htmlFor="cp-total-parcelas">
+          <div className="usuario-form-campo conta-receber-form-campo-numero">
+            <label htmlFor="cr-total-parcelas">
               Total de Parcelas <span className="obrigatorio">*</span>
             </label>
             <input
-              id="cp-total-parcelas"
+              id="cr-total-parcelas"
               type="number"
               min={0}
               value={totalParcelas}
@@ -376,20 +379,20 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-data">
-            <label htmlFor="cp-primeiro-vencimento">1º Vencimento</label>
+          <div className="usuario-form-campo conta-receber-form-campo-data">
+            <label htmlFor="cr-primeiro-vencimento">1º Vencimento</label>
             <input
-              id="cp-primeiro-vencimento"
+              id="cr-primeiro-vencimento"
               type="date"
               value={primeiroVencimento}
               onChange={(e) => setPrimeiroVencimento(e.target.value)}
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-numero">
-            <label htmlFor="cp-intervalo-meses">Intervalo (meses)</label>
+          <div className="usuario-form-campo conta-receber-form-campo-numero">
+            <label htmlFor="cr-intervalo-meses">Intervalo (meses)</label>
             <input
-              id="cp-intervalo-meses"
+              id="cr-intervalo-meses"
               type="number"
               min={1}
               value={intervaloMeses}
@@ -397,11 +400,11 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-tipo-pagamento">
-            <label htmlFor="cp-tipo-pagamento">Tipo de Pagamento</label>
+          <div className="usuario-form-campo conta-receber-form-campo-tipo-pagamento">
+            <label htmlFor="cr-tipo-pagamento">Tipo de Pagamento</label>
             <div className="usuario-form-campo-com-acao">
               <select
-                id="cp-tipo-pagamento"
+                id="cr-tipo-pagamento"
                 value={idPrimeiroTipoPagamento ?? ""}
                 onChange={(e) => setIdPrimeiroTipoPagamento(e.target.value ? Number(e.target.value) : null)}
               >
@@ -424,14 +427,14 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
           </div>
 
           {modoEdicao && saldoDevedor !== null && (
-            <div className="usuario-form-campo conta-pagar-form-campo-valor">
+            <div className="usuario-form-campo conta-receber-form-campo-valor">
               <label>Saldo Devedor</label>
               <input value={numeroParaMoeda(saldoDevedor)} disabled readOnly />
             </div>
           )}
 
           {modoEdicao && (
-            <div className="usuario-form-campo conta-pagar-form-campo-recalcular">
+            <div className="usuario-form-campo conta-receber-form-campo-recalcular">
               <label className="usuario-form-toggle">
                 <input
                   type="checkbox"
@@ -441,7 +444,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                 />
                 Recriar parcelas ao salvar
               </label>
-              <span className="conta-pagar-form-dica">
+              <span className="conta-receber-form-dica">
                 {algumaParcelaPaga
                   ? "Não é possível recriar as parcelas: já existe parcela paga."
                   : "Substitui as parcelas atuais pelas novas informadas acima."}
@@ -451,10 +454,10 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         </div>
 
         <div className="usuario-form-campo">
-          <label htmlFor="cp-observacao">Observação</label>
+          <label htmlFor="cr-observacao">Observação</label>
           <textarea
-            id="cp-observacao"
-            className="conta-pagar-form-textarea"
+            id="cr-observacao"
+            className="conta-receber-form-textarea"
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
             rows={3}
@@ -462,21 +465,21 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         </div>
 
         {modoEdicao && parcelas.length > 0 && (
-          <div className="conta-pagar-form-parcelas">
+          <div className="conta-receber-form-parcelas">
             <h3>Parcelas</h3>
-            <div className="conta-pagar-form-parcelas-tabela-wrapper">
-              <table className="conta-pagar-form-parcelas-tabela">
+            <div className="conta-receber-form-parcelas-tabela-wrapper">
+              <table className="conta-receber-form-parcelas-tabela">
                 <thead>
                   <tr>
                     <th>Nº</th>
                     <th>Vencimento</th>
-                    <th className="conta-pagar-col-valor">Valor</th>
-                    <th className="conta-pagar-col-valor">Pago</th>
+                    <th className="conta-receber-col-valor">Valor</th>
+                    <th className="conta-receber-col-valor">Pago</th>
                     <th>Data Pagamento</th>
                     <th>Tipo Pagamento</th>
                     <th>Status</th>
                     {(podeBaixarParcela || podeEstornarParcela) && (
-                      <th className="conta-pagar-col-acoes">Ações</th>
+                      <th className="conta-receber-col-acoes">Ações</th>
                     )}
                   </tr>
                 </thead>
@@ -485,11 +488,11 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                     const { label, classe } = statusParcelaInfo(p.IdStatusParcela);
                     const paga = parcelaPaga(p);
                     return (
-                      <tr key={p.IdContaPagarParcela}>
+                      <tr key={p.IdContaReceberParcela}>
                         <td>{pad3(p.NumeroParcela)}</td>
                         <td>{new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</td>
-                        <td className="conta-pagar-col-valor">{numeroParaMoeda(p.ValorParcela)}</td>
-                        <td className="conta-pagar-col-valor">{numeroParaMoeda(p.ValorPago)}</td>
+                        <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorParcela)}</td>
+                        <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorPago)}</td>
                         <td>
                           {p.DataPagamento
                             ? new Date(p.DataPagamento).toLocaleDateString("pt-BR", { timeZone: "UTC" })
@@ -497,14 +500,14 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                         </td>
                         <td>{p.DescricaoTipoPagamento || "-"}</td>
                         <td>
-                          <span className={`conta-pagar-badge ${classe}`}>{label.toUpperCase()}</span>
+                          <span className={`conta-receber-badge ${classe}`}>{label.toUpperCase()}</span>
                         </td>
                         {(podeBaixarParcela || podeEstornarParcela) && (
-                          <td className="conta-pagar-col-acoes">
+                          <td className="conta-receber-col-acoes">
                             {podeBaixarParcela && !paga && (
                               <button
                                 type="button"
-                                className="conta-pagar-icone-acao"
+                                className="conta-receber-icone-acao"
                                 title="Dar baixa nesta parcela"
                                 onClick={() => setParcelaEmBaixa(p)}
                               >
@@ -514,7 +517,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                             {podeEstornarParcela && paga && (
                               <button
                                 type="button"
-                                className="conta-pagar-icone-acao estorno"
+                                className="conta-receber-icone-acao estorno"
                                 title="Estornar a baixa desta parcela"
                                 onClick={() => setParcelaEmEstorno(p)}
                               >
@@ -535,14 +538,14 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         {erro && <div className="usuario-form-erro">{erro}</div>}
 
         <button type="submit" className="usuario-form-btn-salvar" disabled={salvando}>
-          {salvando ? "Salvando..." : modoEdicao ? "Salvar" : "Criar Conta a Pagar"}
+          {salvando ? "Salvando..." : modoEdicao ? "Salvar" : "Criar Conta a Receber"}
           <Send size={16} />
         </button>
       </form>
 
       {parcelaEmBaixa && id !== null && (
-        <ContaPagarBaixaModal
-          idContaPagar={id}
+        <ContaReceberBaixaModal
+          idContaReceber={id}
           parcela={parcelaEmBaixa}
           onCancelar={() => setParcelaEmBaixa(null)}
           onBaixada={handleParcelaBaixada}
@@ -550,8 +553,8 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
       )}
 
       {parcelaEmEstorno && id !== null && (
-        <ContaPagarEstornoModal
-          idContaPagar={id}
+        <ContaReceberEstornoModal
+          idContaReceber={id}
           parcela={parcelaEmEstorno}
           onCancelar={() => setParcelaEmEstorno(null)}
           onEstornada={handleParcelaEstornada}
@@ -561,4 +564,4 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
   );
 }
 
-export default ContaPagarForm;
+export default ContaReceberForm;

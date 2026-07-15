@@ -1,0 +1,90 @@
+.conta-receber-baixa-form {
+  border: none;
+  padding: 0;
+  gap: 16px;
+}
+
+.conta-receber-baixa-campo-pequeno {
+  flex: 0 0 90px;
+  min-width: 90px;
+}
+
+.conta-receber-baixa-campo-medio {
+  flex: 0 0 130px;
+  min-width: 130px;
+}
+
+.conta-receber-baixa-campo-tipo-pagamento {
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+
+.conta-receber-baixa-campo-usuario {
+  flex: 1 1 100%;
+  min-width: 260px;
+}
+
+.conta-receber-baixa-badge {
+  align-self: center;
+  margin-top: 2px;
+}
+
+.conta-receber-baixa-acoes {
+  display: flex;
+  gap: 12px;
+}
+
+.conta-receber-baixa-btn-salvar,
+.conta-receber-baixa-btn-cancelar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.conta-receber-baixa-btn-salvar {
+  background: #2f9e46;
+  color: #f2ede8;
+}
+
+.conta-receber-baixa-btn-salvar:hover:not(:disabled) {
+  background: #278238;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.conta-receber-baixa-btn-cancelar {
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+.conta-receber-baixa-btn-cancelar:hover:not(:disabled) {
+  background: var(--cor-fundo-hover);
+}
+
+.conta-receber-baixa-btn-salvar:disabled,
+.conta-receber-baixa-btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.conta-receber-baixa-atalho {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.conta-receber-estorno-aviso {
+  margin: 0;
+  font-size: 14px;
+  color: var(--cor-texto);
+  line-height: 1.5;
+}

@@ -18,6 +18,8 @@ import servicoRouter from "./routes/servico";
 import tipoPagamentoRouter from "./routes/tipoPagamento";
 import fornecedoresRouter from "./routes/fornecedores";
 import contaPagarRouter from "./routes/contaPagar";
+import contaReceberRouter from "./routes/contaReceber";
+import caixaRouter from "./routes/caixa";
 import dashboardRouter from "./routes/dashboard";
 
 const app = express();
@@ -49,6 +51,8 @@ app.use("/servico", servicoRouter);
 app.use("/tipo-pagamento", tipoPagamentoRouter);
 app.use("/fornecedores", fornecedoresRouter);
 app.use("/conta-pagar", contaPagarRouter);
+app.use("/conta-receber", contaReceberRouter);
+app.use("/caixa", caixaRouter);
 app.use("/dashboard", dashboardRouter);
 
 app.get("/health", (_req, res) => {
