@@ -315,15 +315,15 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                                 <tr>
                                   <th>Formulário</th>
                                   <th>Grupo</th>
-                                  <th title="Acessar">Ac.</th>
-                                  <th title="Adicionar">Ad.</th>
-                                  <th title="Editar">Ed.</th>
-                                  <th title="Excluir">Ex.</th>
-                                  <th title="Imprimir">Imp.</th>
-                                  <th title="Baixar Conta a Pagar">B.CP</th>
-                                  <th title="Estornar Conta a Pagar">E.CP</th>
-                                  <th title="Baixar Conta a Receber">B.CR</th>
-                                  <th title="Estornar Conta a Receber">E.CR</th>
+                                  <th className="usuarios-col-flag">Acessar</th>
+                                  <th className="usuarios-col-flag">Adicionar</th>
+                                  <th className="usuarios-col-flag">Editar</th>
+                                  <th className="usuarios-col-flag">Excluir</th>
+                                  <th className="usuarios-col-flag">Imprimir</th>
+                                  <th className="usuarios-col-flag">Baixar C.P.</th>
+                                  <th className="usuarios-col-flag">Estornar C.P.</th>
+                                  <th className="usuarios-col-flag">Baixar C.R.</th>
+                                  <th className="usuarios-col-flag">Estornar C.R.</th>
                                 </tr>
                               </thead>
                               <tbody>
