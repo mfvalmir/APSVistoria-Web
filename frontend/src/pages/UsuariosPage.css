@@ -208,6 +208,12 @@
   padding: 14px 16px !important;
 }
 
+.usuarios-tabela tbody tr.usuarios-linha-pai-expandida td {
+  background: #1c6fb01a;
+  font-weight: 700;
+  color: #1c6fb0;
+}
+
 .usuarios-permissoes-celula {
   white-space: normal;
 }

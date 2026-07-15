@@ -228,6 +228,12 @@
   padding: 14px 16px !important;
 }
 
+.conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida td {
+  background: #1c6fb01a;
+  font-weight: 700;
+  color: #1c6fb0;
+}
+
 .conta-pagar-parcelas-celula {
   white-space: normal;
 }

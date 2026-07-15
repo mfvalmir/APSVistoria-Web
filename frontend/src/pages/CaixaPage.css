@@ -235,6 +235,12 @@
   padding: 14px 16px !important;
 }
 
+.caixa-tabela tbody tr.caixa-linha-pai-expandida td {
+  background: #1c6fb01a;
+  font-weight: 700;
+  color: #1c6fb0;
+}
+
 .caixa-movimentos-celula {
   white-space: normal;
 }

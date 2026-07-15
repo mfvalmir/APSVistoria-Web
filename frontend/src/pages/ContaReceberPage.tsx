@@ -287,7 +287,7 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
                 const parcelas = parcelasPorConta[c.IdContaReceber];
                 return (
                   <Fragment key={c.IdContaReceber}>
-                  <tr>
+                  <tr className={expandido ? "conta-receber-linha-pai-expandida" : undefined}>
                     <td className="conta-receber-col-expandir">
                       <button
                         type="button"
