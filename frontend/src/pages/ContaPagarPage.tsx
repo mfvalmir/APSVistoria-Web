@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarContasPagar, excluirContaPagar, ContaPagar, STATUS_CONTA_PAGAR } from "../api/contaPagar";
 import { ItemMenu } from "../api/menu";
@@ -107,8 +108,16 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
       )
     )
       return;
-    await excluirContaPagar(conta.idContaPagar);
-    carregar();
+    try {
+      await excluirContaPagar(conta.idContaPagar);
+      carregar();
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        window.alert(err.response.data?.erro || "Não foi possível excluir a conta a pagar");
+      } else {
+        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+      }
+    }
   }
 
   function abrirCriacao() {

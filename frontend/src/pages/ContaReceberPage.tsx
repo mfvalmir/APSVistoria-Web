@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarContasReceber, excluirContaReceber, ContaReceber, STATUS_CONTA_RECEBER } from "../api/contaReceber";
 import { ItemMenu } from "../api/menu";
@@ -107,8 +108,16 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
       )
     )
       return;
-    await excluirContaReceber(conta.IdContaReceber);
-    carregar();
+    try {
+      await excluirContaReceber(conta.IdContaReceber);
+      carregar();
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        window.alert(err.response.data?.erro || "Não foi possível excluir a conta a receber");
+      } else {
+        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+      }
+    }
   }
 
   function abrirCriacao() {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarCaixas, excluirCaixa, Caixa } from "../api/caixa";
 import { ItemMenu } from "../api/menu";
@@ -110,8 +111,16 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
       )
     )
       return;
-    await excluirCaixa(caixa.idCaixa);
-    carregar();
+    try {
+      await excluirCaixa(caixa.idCaixa);
+      carregar();
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        window.alert(err.response.data?.erro || "Não foi possível excluir o caixa");
+      } else {
+        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+      }
+    }
   }
 
   function abrirCriacao() {
