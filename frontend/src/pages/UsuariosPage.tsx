@@ -249,7 +249,13 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                 const permissoesUsuario = permissoesPorUsuario[u.IDUser];
                 return (
                   <Fragment key={u.IDUser}>
-                  <tr className={expandido ? "usuarios-linha-pai-expandida" : undefined}>
+                  <tr
+                    className={
+                      expandido
+                        ? `usuarios-linha-pai-expandida usuarios-linha-pai-expandida-${ativo ? "ativo" : "inativo"}`
+                        : undefined
+                    }
+                  >
                     <td className="usuarios-col-expandir">
                       <button
                         type="button"

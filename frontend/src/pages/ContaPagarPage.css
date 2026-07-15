@@ -229,9 +229,24 @@
 }
 
 .conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida td {
-  background: #1c6fb01a;
+  background: var(--cor-fundo-secundario);
   font-weight: 700;
-  color: #1c6fb0;
+}
+
+.conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida-pendente td {
+  color: #c8860d;
+}
+
+.conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida-pago td {
+  color: #2f9e46;
+}
+
+.conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida-parcial td {
+  color: #2f8fd9;
+}
+
+.conta-pagar-tabela tbody tr.conta-pagar-linha-pai-expandida-cancelado td {
+  color: var(--cor-erro);
 }
 
 .conta-pagar-parcelas-celula {

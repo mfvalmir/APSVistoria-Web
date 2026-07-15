@@ -278,7 +278,13 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
                 const movimentos = movimentosPorCaixa[c.idCaixa];
                 return (
                   <Fragment key={c.idCaixa}>
-                    <tr className={expandido ? "caixa-linha-pai-expandida" : undefined}>
+                    <tr
+                      className={
+                        expandido
+                          ? `caixa-linha-pai-expandida caixa-linha-pai-expandida-${aberto ? "aberto" : "fechado"}`
+                          : undefined
+                      }
+                    >
                       <td className="caixa-col-expandir">
                         <button
                           type="button"

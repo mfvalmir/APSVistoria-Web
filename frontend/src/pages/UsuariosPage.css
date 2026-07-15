@@ -209,9 +209,16 @@
 }
 
 .usuarios-tabela tbody tr.usuarios-linha-pai-expandida td {
-  background: #1c6fb01a;
+  background: var(--cor-fundo-secundario);
   font-weight: 700;
-  color: #1c6fb0;
+}
+
+.usuarios-tabela tbody tr.usuarios-linha-pai-expandida-ativo td {
+  color: #2f9e46;
+}
+
+.usuarios-tabela tbody tr.usuarios-linha-pai-expandida-inativo td {
+  color: var(--cor-erro);
 }
 
 .usuarios-permissoes-celula {

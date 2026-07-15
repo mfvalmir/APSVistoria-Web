@@ -229,9 +229,24 @@
 }
 
 .conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida td {
-  background: #1c6fb01a;
+  background: var(--cor-fundo-secundario);
   font-weight: 700;
-  color: #1c6fb0;
+}
+
+.conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida-pendente td {
+  color: #c8860d;
+}
+
+.conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida-pago td {
+  color: #2f9e46;
+}
+
+.conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida-parcial td {
+  color: #2f8fd9;
+}
+
+.conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida-cancelado td {
+  color: var(--cor-erro);
 }
 
 .conta-receber-parcelas-celula {

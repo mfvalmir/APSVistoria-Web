@@ -287,7 +287,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                 const parcelas = parcelasPorConta[c.idContaPagar];
                 return (
                   <Fragment key={c.idContaPagar}>
-                  <tr className={expandido ? "conta-pagar-linha-pai-expandida" : undefined}>
+                  <tr className={expandido ? `conta-pagar-linha-pai-expandida conta-pagar-linha-pai-expandida-${classe}` : undefined}>
                     <td className="conta-pagar-col-expandir">
                       <button
                         type="button"

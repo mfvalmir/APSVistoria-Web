@@ -236,9 +236,16 @@
 }
 
 .caixa-tabela tbody tr.caixa-linha-pai-expandida td {
-  background: #1c6fb01a;
+  background: var(--cor-fundo-secundario);
   font-weight: 700;
-  color: #1c6fb0;
+}
+
+.caixa-tabela tbody tr.caixa-linha-pai-expandida-aberto td {
+  color: #2f9e46;
+}
+
+.caixa-tabela tbody tr.caixa-linha-pai-expandida-fechado td {
+  color: var(--cor-texto-fraco);
 }
 
 .caixa-movimentos-celula {
