@@ -1,0 +1,216 @@
+.inicio-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.inicio-erro {
+  color: var(--cor-erro);
+}
+
+/* KPIs */
+
+.inicio-kpis {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inicio-kpi {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--cor-fundo-secundario);
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.inicio-kpi-icone {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inicio-kpi-icone-caixa {
+  background: #6b4a3a22;
+  color: var(--cor-marca);
+}
+
+.inicio-kpi-icone-receber {
+  background: #0ca30c22;
+  color: #0ca30c;
+}
+
+.inicio-kpi-icone-pagar {
+  background: #d03b3b22;
+  color: var(--cor-erro);
+}
+
+.inicio-kpi-icone-vistoria {
+  background: #2a78d622;
+  color: #2a78d6;
+}
+
+.inicio-kpi-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inicio-kpi-label {
+  font-size: 12px;
+  color: var(--cor-texto-fraco);
+}
+
+.inicio-kpi-valor {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cor-texto-titulo);
+  white-space: nowrap;
+}
+
+.inicio-kpi-nota {
+  font-size: 11px;
+  color: var(--cor-texto-fraco);
+}
+
+/* Alertas + próximos vencimentos */
+
+.inicio-alertas-vencimentos {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inicio-alertas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 280px;
+}
+
+.inicio-alerta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--cor-texto);
+}
+
+.inicio-alerta strong {
+  font-size: 15px;
+}
+
+.inicio-alerta-valor {
+  display: block;
+  font-size: 12px;
+  color: var(--cor-texto-fraco);
+}
+
+.inicio-alerta-critica {
+  background: #d03b3b1a;
+  color: var(--cor-erro);
+  border: 1px solid #d03b3b33;
+}
+
+.inicio-alerta-aviso {
+  background: #fab2191a;
+  color: #a06b00;
+  border: 1px solid #fab21944;
+}
+
+:root[data-theme="dark"] .inicio-alerta-aviso {
+  color: #fab219;
+}
+
+.inicio-alerta-vazia {
+  opacity: 0.55;
+}
+
+.inicio-proximos {
+  flex: 1;
+  min-width: 320px;
+  background: var(--cor-fundo-secundario);
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.inicio-proximos-titulo {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto-titulo);
+}
+
+.inicio-proximos-vazio {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cor-texto-fraco);
+}
+
+.inicio-proximos-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.inicio-proximos-tabela td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+.inicio-proximos-tabela tr:last-child td {
+  border-bottom: none;
+}
+
+.inicio-proximos-descricao {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inicio-proximos-data,
+.inicio-proximos-valor {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.inicio-badge-tipo {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.inicio-badge-tipo.pagar {
+  background: #d03b3b22;
+  color: var(--cor-erro);
+}
+
+.inicio-badge-tipo.receber {
+  background: #0ca30c22;
+  color: #0ca30c;
+}
+
+/* Gráficos */
+
+.inicio-graficos-mensais {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}

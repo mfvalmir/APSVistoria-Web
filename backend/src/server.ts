@@ -17,6 +17,8 @@ import responsaveisRouter from "./routes/responsaveis";
 import servicoRouter from "./routes/servico";
 import tipoPagamentoRouter from "./routes/tipoPagamento";
 import fornecedoresRouter from "./routes/fornecedores";
+import contaPagarRouter from "./routes/contaPagar";
+import dashboardRouter from "./routes/dashboard";
 
 const app = express();
 
@@ -46,6 +48,8 @@ app.use("/clientes", responsaveisRouter);
 app.use("/servico", servicoRouter);
 app.use("/tipo-pagamento", tipoPagamentoRouter);
 app.use("/fornecedores", fornecedoresRouter);
+app.use("/conta-pagar", contaPagarRouter);
+app.use("/dashboard", dashboardRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", banco: process.env.DB_NAME });

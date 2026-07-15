@@ -14,6 +14,7 @@ interface AppShellProps {
     rota: string | null;
     titulo: string;
     permissoes: ItemMenu["permissoes"] | null;
+    podeVerInicio: boolean;
     navegarPara: (rota: string, nome: string, grupo: string) => void;
     irParaInicio: () => void;
   }) => React.ReactNode;
@@ -21,6 +22,7 @@ interface AppShellProps {
 
 function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: AppShellProps) {
   const [grupos, setGrupos] = useState<GrupoMenu[]>([]);
+  const [podeVerInicio, setPodeVerInicio] = useState(false);
   const [carregandoMenu, setCarregandoMenu] = useState(true);
   const [sidebarAberta, setSidebarAberta] = useState(true);
   const [rotaAtual, setRotaAtual] = useState<string | null>(null);
@@ -29,7 +31,10 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
 
   useEffect(() => {
     buscarMenu()
-      .then(setGrupos)
+      .then(({ grupos, podeVerInicio }) => {
+        setGrupos(grupos);
+        setPodeVerInicio(podeVerInicio);
+      })
       .finally(() => setCarregandoMenu(false));
   }, []);
 
@@ -74,6 +79,7 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
           rota: rotaAtual,
           titulo: tituloAtual,
           permissoes: itemAtual?.permissoes || null,
+          podeVerInicio,
           navegarPara: selecionarItem,
           irParaInicio,
         })}

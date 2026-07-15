@@ -17,6 +17,10 @@ function paraRota(nomeFormulario: string): string {
 //
 // "Cadastro de Perfil de Usuários" (frmCadPermissoes) fica de fora do menu de propósito:
 // já é acessível como ação (ícone de escudo) dentro da listagem de Cadastro de Usuários.
+//
+// "DashboardWeb" também fica de fora da árvore: não é uma tela navegável, é só o formulário
+// usado em Cadastro de Perfil de Usuários para liberar/bloquear o conteúdo da tela Início
+// (painel com Caixa/Contas/Vistorias), que sempre existe como landing page (rota null).
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const pool = await getPool();
@@ -24,23 +28,43 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
     const query = req.user!.administrador
       ? `SELECT FormularioID, NomeFormulario, Descricao, Grupo, Ordem, Icone,
                 CAST(1 AS BIT) AS PodeAdicionar, CAST(1 AS BIT) AS PodeEditar,
-                CAST(1 AS BIT) AS PodeExcluir, CAST(1 AS BIT) AS PodeImprimir
+                CAST(1 AS BIT) AS PodeExcluir, CAST(1 AS BIT) AS PodeImprimir,
+                CAST(1 AS BIT) AS PodeBaixarParCP, CAST(1 AS BIT) AS PodeEstornarParCP,
+                CAST(1 AS BIT) AS PodeBaixarParCR, CAST(1 AS BIT) AS PodeEstornarParCR
          FROM Formularios
          WHERE Ativo = 'A'
-           AND NomeFormulario <> 'frmCadPermissoes'
+           AND NomeFormulario NOT IN ('frmCadPermissoes', 'DashboardWeb')
          ORDER BY Grupo, Ordem, Descricao`
       : `SELECT f.FormularioID, f.NomeFormulario, f.Descricao, f.Grupo, f.Ordem, f.Icone,
-                pi.PodeAdicionar, pi.PodeEditar, pi.PodeExcluir, pi.PodeImprimir
+                pi.PodeAdicionar, pi.PodeEditar, pi.PodeExcluir, pi.PodeImprimir,
+                pi.PodeBaixarParCP, pi.PodeEstornarParCP, pi.PodeBaixarParCR, pi.PodeEstornarParCR
          FROM Permissoes p
          JOIN PermissoesItens pi ON pi.PermissaoID = p.PermissaoID
          JOIN Formularios f ON f.FormularioID = pi.FormularioID
          WHERE p.UsuarioID = @usuarioId
            AND pi.AcessoFormulario = 1
            AND f.Ativo = 'A'
-           AND f.NomeFormulario <> 'frmCadPermissoes'
+           AND f.NomeFormulario NOT IN ('frmCadPermissoes', 'DashboardWeb')
          ORDER BY f.Grupo, f.Ordem, f.Descricao`;
 
     const result = await pool.request().input("usuarioId", sql.Int, req.user!.id).query(query);
+
+    let podeVerInicio = req.user!.administrador;
+    if (!podeVerInicio) {
+      const acessoInicio = await pool
+        .request()
+        .input("usuarioId", sql.Int, req.user!.id)
+        .query(
+          `SELECT TOP 1 pi.ItemID
+           FROM Permissoes p
+           JOIN PermissoesItens pi ON pi.PermissaoID = p.PermissaoID
+           JOIN Formularios f ON f.FormularioID = pi.FormularioID
+           WHERE p.UsuarioID = @usuarioId
+             AND pi.AcessoFormulario = 1
+             AND f.NomeFormulario = 'DashboardWeb'`
+        );
+      podeVerInicio = acessoInicio.recordset.length > 0;
+    }
 
     const grupos = new Map<string, any[]>();
     for (const row of result.recordset) {
@@ -56,12 +80,16 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
           editar: row.PodeEditar,
           excluir: row.PodeExcluir,
           imprimir: row.PodeImprimir,
+          baixarParCP: row.PodeBaixarParCP,
+          estornarParCP: row.PodeEstornarParCP,
+          baixarParCR: row.PodeBaixarParCR,
+          estornarParCR: row.PodeEstornarParCR,
         },
       });
     }
 
     const arvore = Array.from(grupos.entries()).map(([grupo, itens]) => ({ grupo, itens }));
-    res.json(arvore);
+    res.json({ grupos: arvore, podeVerInicio });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao carregar menu" });

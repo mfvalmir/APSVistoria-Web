@@ -13,7 +13,9 @@ import ClientesPage from "./pages/ClientesPage";
 import ServicoPage from "./pages/ServicoPage";
 import TipoPagamentoPage from "./pages/TipoPagamentoPage";
 import FornecedorPage from "./pages/FornecedorPage";
+import ContaPagarPage from "./pages/ContaPagarPage";
 import Placeholder from "./pages/Placeholder";
+import Inicio from "./pages/Inicio";
 import { decodeToken } from "./utils/jwt";
 import { obterTemaInicial, aplicarTema, Tema } from "./utils/theme";
 
@@ -73,7 +75,7 @@ function App() {
       onAlternarTema={alternarTema}
       onLogout={handleLogout}
     >
-      {({ rota, titulo, permissoes, navegarPara, irParaInicio }) => {
+      {({ rota, titulo, permissoes, podeVerInicio, navegarPara, irParaInicio }) => {
         if (rota === "usuario") {
           return (
             <UsuariosPage
@@ -184,7 +186,25 @@ function App() {
             />
           );
         }
-        if (rota === null) return <Placeholder titulo="Início" />;
+        if (rota === "conta-pagar") {
+          return (
+            <ContaPagarPage
+              permissoes={permissoes}
+              administrador={administradorLogado()}
+              navegarPara={navegarPara}
+              voltarInicio={irParaInicio}
+            />
+          );
+        }
+        if (rota === null) {
+          return podeVerInicio ? (
+            <Inicio />
+          ) : (
+            <div>
+              <h2>Bem-vindo(a), {nomeUsuarioLogado()}!</h2>
+            </div>
+          );
+        }
         return <Placeholder titulo={titulo} />;
       }}
     </AppShell>

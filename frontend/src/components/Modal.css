@@ -1,0 +1,58 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-painel {
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.modal-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--cor-marca);
+  color: var(--cor-marca-texto);
+  border-radius: 12px 12px 0 0;
+  position: sticky;
+  top: 0;
+}
+
+.modal-cabecalho h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.modal-fechar {
+  border: none;
+  background: transparent;
+  color: var(--cor-marca-texto);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.modal-fechar:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.modal-corpo {
+  padding: 20px;
+}

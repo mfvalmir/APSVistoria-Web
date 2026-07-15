@@ -10,6 +10,10 @@ export interface ItemMenu {
     editar: boolean;
     excluir: boolean;
     imprimir: boolean;
+    baixarParCP: boolean;
+    estornarParCP: boolean;
+    baixarParCR: boolean;
+    estornarParCR: boolean;
   };
 }
 
@@ -18,7 +22,12 @@ export interface GrupoMenu {
   itens: ItemMenu[];
 }
 
-export async function buscarMenu(): Promise<GrupoMenu[]> {
-  const { data } = await api.get<GrupoMenu[]>("/menu");
+export interface RespostaMenu {
+  grupos: GrupoMenu[];
+  podeVerInicio: boolean;
+}
+
+export async function buscarMenu(): Promise<RespostaMenu> {
+  const { data } = await api.get<RespostaMenu>("/menu");
   return data;
 }
