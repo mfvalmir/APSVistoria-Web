@@ -1,6 +1,20 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, Search, X, ShieldCheck, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  Search,
+  X,
+  ShieldCheck,
+  Pencil,
+  Trash2,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+  ChevronDown,
+  Check,
+} from "lucide-react";
 import { listarUsuarios, desativarUsuario, Usuario } from "../api/usuarios";
+import { buscarPermissoes, AplicacaoRepassada } from "../api/permissoes";
 import { ItemMenu } from "../api/menu";
 import UsuarioForm from "./UsuarioForm";
 import UsuarioPerfil from "./UsuarioPerfil";
@@ -44,6 +58,34 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("usuarios", COLUNAS_PADRAO)
   );
+
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
+  const [permissoesPorUsuario, setPermissoesPorUsuario] = useState<Record<number, AplicacaoRepassada[]>>({});
+  const [carregandoPermissoes, setCarregandoPermissoes] = useState<Set<number>>(new Set());
+
+  async function alternarExpandir(idUser: number) {
+    const estavaExpandido = expandidos.has(idUser);
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (estavaExpandido) novo.delete(idUser);
+      else novo.add(idUser);
+      return novo;
+    });
+
+    if (estavaExpandido || permissoesPorUsuario[idUser]) return;
+
+    setCarregandoPermissoes((atual) => new Set(atual).add(idUser));
+    try {
+      const dados = await buscarPermissoes(idUser);
+      setPermissoesPorUsuario((atual) => ({ ...atual, [idUser]: dados.repassadas }));
+    } finally {
+      setCarregandoPermissoes((atual) => {
+        const novo = new Set(atual);
+        novo.delete(idUser);
+        return novo;
+      });
+    }
+  }
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -182,6 +224,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
         <table className="usuarios-tabela">
           <thead>
             <tr>
+              <th className="usuarios-col-expandir"></th>
               {colunasVisiveis.has("id") && <th>ID</th>}
               {colunasVisiveis.has("usuario") && <th>Usuário</th>}
               {colunasVisiveis.has("funcionario") && <th>Funcionário</th>}
@@ -193,17 +236,30 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="usuarios-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 2} className="usuarios-vazio">Carregando...</td>
               </tr>
             ) : usuariosPagina.length === 0 ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="usuarios-vazio">Nenhum usuário encontrado</td>
+                <td colSpan={colunasVisiveis.size + 2} className="usuarios-vazio">Nenhum usuário encontrado</td>
               </tr>
             ) : (
               usuariosPagina.map((u) => {
                 const ativo = u.Situacao.trim() === "A";
+                const expandido = expandidos.has(u.IDUser);
+                const permissoesUsuario = permissoesPorUsuario[u.IDUser];
                 return (
-                  <tr key={u.IDUser}>
+                  <Fragment key={u.IDUser}>
+                  <tr>
+                    <td className="usuarios-col-expandir">
+                      <button
+                        type="button"
+                        className={`usuarios-btn-expandir ${expandido ? "aberto" : ""}`}
+                        title={expandido ? "Ocultar permissões" : "Ver permissões"}
+                        onClick={() => alternarExpandir(u.IDUser)}
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </td>
                     {colunasVisiveis.has("id") && <td>{u.IDUser}</td>}
                     {colunasVisiveis.has("usuario") && <td>{u.Loginn}</td>}
                     {colunasVisiveis.has("funcionario") && <td>{u.NomeFuncionario || "-"}</td>}
@@ -245,6 +301,55 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                       )}
                     </td>
                   </tr>
+                  {expandido && (
+                    <tr className="usuarios-linha-expandida">
+                      <td colSpan={colunasVisiveis.size + 2} className="usuarios-permissoes-celula">
+                        {carregandoPermissoes.has(u.IDUser) ? (
+                          <div className="usuarios-permissoes-estado">Carregando permissões...</div>
+                        ) : !permissoesUsuario || permissoesUsuario.length === 0 ? (
+                          <div className="usuarios-permissoes-estado">Nenhuma permissão repassada.</div>
+                        ) : (
+                          <div className="usuarios-permissoes-tabela-wrapper">
+                            <table className="usuarios-permissoes-tabela">
+                              <thead>
+                                <tr>
+                                  <th>Formulário</th>
+                                  <th>Grupo</th>
+                                  <th title="Acessar">Ac.</th>
+                                  <th title="Adicionar">Ad.</th>
+                                  <th title="Editar">Ed.</th>
+                                  <th title="Excluir">Ex.</th>
+                                  <th title="Imprimir">Imp.</th>
+                                  <th title="Baixar Conta a Pagar">B.CP</th>
+                                  <th title="Estornar Conta a Pagar">E.CP</th>
+                                  <th title="Baixar Conta a Receber">B.CR</th>
+                                  <th title="Estornar Conta a Receber">E.CR</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {permissoesUsuario.map((item) => (
+                                  <tr key={item.formularioId}>
+                                    <td>{item.descricao}</td>
+                                    <td>{item.grupo || "-"}</td>
+                                    <td className="usuarios-col-flag">{item.acessoFormulario && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeAdicionar && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeEditar && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeExcluir && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeImprimir && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeBaixarParCP && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeEstornarParCP && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeBaixarParCR && <Check size={14} />}</td>
+                                    <td className="usuarios-col-flag">{item.podeEstornarParCR && <Check size={14} />}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             )}

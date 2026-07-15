@@ -1,11 +1,30 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { listarContasReceber, excluirContaReceber, ContaReceber, STATUS_CONTA_RECEBER } from "../api/contaReceber";
+import {
+  ArrowLeft,
+  Search,
+  X,
+  Pencil,
+  Trash2,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+  ChevronDown,
+} from "lucide-react";
+import {
+  listarContasReceber,
+  excluirContaReceber,
+  obterContaReceber,
+  ContaReceber,
+  ParcelaContaReceber,
+  STATUS_CONTA_RECEBER,
+} from "../api/contaReceber";
 import { ItemMenu } from "../api/menu";
 import ContaReceberForm from "./ContaReceberForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import "./ContaReceberForm.css";
 import "./ContaReceberPage.css";
 
 type SubView = "lista" | "form";
@@ -47,6 +66,10 @@ function statusInfo(idStatus: number): { label: string; classe: string } {
   return { label: item?.label ?? "-", classe: classes[idStatus] ?? "pendente" };
 }
 
+function pad3(valor: number): string {
+  return String(valor).padStart(3, "0");
+}
+
 interface ContaReceberPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -70,6 +93,34 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("conta-receber", COLUNAS_PADRAO)
   );
+
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
+  const [parcelasPorConta, setParcelasPorConta] = useState<Record<number, ParcelaContaReceber[]>>({});
+  const [carregandoParcelas, setCarregandoParcelas] = useState<Set<number>>(new Set());
+
+  async function alternarExpandir(idContaReceber: number) {
+    const estavaExpandido = expandidos.has(idContaReceber);
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (estavaExpandido) novo.delete(idContaReceber);
+      else novo.add(idContaReceber);
+      return novo;
+    });
+
+    if (estavaExpandido || parcelasPorConta[idContaReceber]) return;
+
+    setCarregandoParcelas((atual) => new Set(atual).add(idContaReceber));
+    try {
+      const dados = await obterContaReceber(idContaReceber);
+      setParcelasPorConta((atual) => ({ ...atual, [idContaReceber]: dados.parcelas }));
+    } finally {
+      setCarregandoParcelas((atual) => {
+        const novo = new Set(atual);
+        novo.delete(idContaReceber);
+        return novo;
+      });
+    }
+  }
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -205,6 +256,7 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
         <table className="conta-receber-tabela">
           <thead>
             <tr>
+              <th className="conta-receber-col-expandir"></th>
               {colunasVisiveis.has("id") && <th>ID</th>}
               {colunasVisiveis.has("numeroDocumento") && <th>Documento</th>}
               {colunasVisiveis.has("descricao") && <th>Descrição</th>}
@@ -220,19 +272,32 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="conta-receber-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 2} className="conta-receber-vazio">Carregando...</td>
               </tr>
             ) : contasPagina.length === 0 ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="conta-receber-vazio">
+                <td colSpan={colunasVisiveis.size + 2} className="conta-receber-vazio">
                   Nenhuma conta a receber encontrada
                 </td>
               </tr>
             ) : (
               contasPagina.map((c) => {
                 const { label, classe } = statusInfo(c.IdStatusContaReceber);
+                const expandido = expandidos.has(c.IdContaReceber);
+                const parcelas = parcelasPorConta[c.IdContaReceber];
                 return (
-                  <tr key={c.IdContaReceber}>
+                  <Fragment key={c.IdContaReceber}>
+                  <tr>
+                    <td className="conta-receber-col-expandir">
+                      <button
+                        type="button"
+                        className={`conta-receber-btn-expandir ${expandido ? "aberto" : ""}`}
+                        title={expandido ? "Ocultar parcelas" : "Ver parcelas"}
+                        onClick={() => alternarExpandir(c.IdContaReceber)}
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </td>
                     {colunasVisiveis.has("id") && <td>{c.IdContaReceber}</td>}
                     {colunasVisiveis.has("numeroDocumento") && <td>{c.NumeroDocumento || "-"}</td>}
                     {colunasVisiveis.has("descricao") && <td>{c.Descricao}</td>}
@@ -271,6 +336,54 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
                       )}
                     </td>
                   </tr>
+                  {expandido && (
+                    <tr className="conta-receber-linha-expandida">
+                      <td colSpan={colunasVisiveis.size + 2} className="conta-receber-parcelas-celula">
+                        {carregandoParcelas.has(c.IdContaReceber) ? (
+                          <div className="conta-receber-parcelas-estado">Carregando parcelas...</div>
+                        ) : !parcelas || parcelas.length === 0 ? (
+                          <div className="conta-receber-parcelas-estado">Nenhuma parcela nesta conta.</div>
+                        ) : (
+                          <div className="conta-receber-form-parcelas-tabela-wrapper">
+                            <table className="conta-receber-form-parcelas-tabela">
+                              <thead>
+                                <tr>
+                                  <th>Nº</th>
+                                  <th>Vencimento</th>
+                                  <th className="conta-receber-col-valor">Valor</th>
+                                  <th className="conta-receber-col-valor">Pago</th>
+                                  <th>Data Pagamento</th>
+                                  <th>Tipo Pagamento</th>
+                                  <th>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {parcelas.map((p) => {
+                                  const infoParcela = statusInfo(p.IdStatusParcela);
+                                  return (
+                                    <tr key={p.IdContaReceberParcela}>
+                                      <td>{pad3(p.NumeroParcela)}</td>
+                                      <td>{formatarData(p.DataVencimento)}</td>
+                                      <td className="conta-receber-col-valor">{formatarValor(p.ValorParcela)}</td>
+                                      <td className="conta-receber-col-valor">{formatarValor(p.ValorPago)}</td>
+                                      <td>{p.DataPagamento ? formatarData(p.DataPagamento) : "-"}</td>
+                                      <td>{p.DescricaoTipoPagamento || "-"}</td>
+                                      <td>
+                                        <span className={`conta-receber-badge ${infoParcela.classe}`}>
+                                          {infoParcela.label.toUpperCase()}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             )}

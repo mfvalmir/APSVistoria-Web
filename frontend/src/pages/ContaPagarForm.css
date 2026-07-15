@@ -114,7 +114,10 @@
   font-size: 14px;
 }
 
-.conta-pagar-form-parcelas-tabela th {
+/* "table." no seletor é de propósito: esta tabela também é embutida dentro da tabela de
+   listagem (linha expandida de ContaPagarPage) - sem o prefixo de tipo, ".conta-pagar-tabela
+   th/td" (mesma especificidade) venceria por ordem de import e estragaria o padding. */
+table.conta-pagar-form-parcelas-tabela th {
   text-align: left;
   padding: 10px 14px;
   background: var(--cor-fundo-secundario);
@@ -124,16 +127,16 @@
   white-space: nowrap;
 }
 
-.conta-pagar-form-parcelas-tabela td {
+table.conta-pagar-form-parcelas-tabela td {
   padding: 7px 14px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
 }
 
-.conta-pagar-form-parcelas-tabela tbody tr:last-child td {
+table.conta-pagar-form-parcelas-tabela tbody tr:last-child td {
   border-bottom: none;
 }
 
-.conta-pagar-form-parcelas-tabela tbody tr:nth-child(even) {
+table.conta-pagar-form-parcelas-tabela tbody tr:nth-child(even) {
   background: var(--cor-fundo-secundario);
 }

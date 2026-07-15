@@ -172,6 +172,97 @@
   color: var(--cor-erro);
 }
 
+.usuarios-col-expandir {
+  width: 1%;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+}
+
+.usuarios-btn-expandir {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usuarios-btn-expandir:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.usuarios-btn-expandir svg {
+  transition: transform 0.15s ease;
+}
+
+.usuarios-btn-expandir.aberto svg {
+  transform: rotate(180deg);
+}
+
+.usuarios-linha-expandida td {
+  background: var(--cor-fundo-secundario);
+  padding: 14px 16px !important;
+}
+
+.usuarios-permissoes-celula {
+  white-space: normal;
+}
+
+.usuarios-permissoes-estado {
+  text-align: center;
+  color: var(--cor-texto-fraco);
+  padding: 12px;
+}
+
+.usuarios-permissoes-tabela-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+}
+
+/* "table." no seletor é de propósito: esta tabela fica aninhada dentro de ".usuarios-tabela"
+   (linha expandida) - sem o prefixo de tipo, ".usuarios-tabela th/td" (mesma especificidade)
+   venceria por ordem de import e estragaria o padding. */
+table.usuarios-permissoes-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.usuarios-permissoes-tabela th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--cor-fundo);
+  color: var(--cor-texto-titulo);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cor-borda);
+  white-space: nowrap;
+}
+
+table.usuarios-permissoes-tabela td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+  white-space: nowrap;
+}
+
+table.usuarios-permissoes-tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+table.usuarios-permissoes-tabela tbody tr:nth-child(even) {
+  background: var(--cor-fundo);
+}
+
+.usuarios-col-flag {
+  text-align: center;
+  color: #2f9e46;
+}
+
 .usuarios-col-status {
   text-align: center;
 }

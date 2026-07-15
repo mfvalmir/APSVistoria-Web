@@ -1,11 +1,30 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { listarContasPagar, excluirContaPagar, ContaPagar, STATUS_CONTA_PAGAR } from "../api/contaPagar";
+import {
+  ArrowLeft,
+  Search,
+  X,
+  Pencil,
+  Trash2,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+  ChevronDown,
+} from "lucide-react";
+import {
+  listarContasPagar,
+  excluirContaPagar,
+  obterContaPagar,
+  ContaPagar,
+  ParcelaContaPagar,
+  STATUS_CONTA_PAGAR,
+} from "../api/contaPagar";
 import { ItemMenu } from "../api/menu";
 import ContaPagarForm from "./ContaPagarForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import "./ContaPagarForm.css";
 import "./ContaPagarPage.css";
 
 type SubView = "lista" | "form";
@@ -47,6 +66,10 @@ function statusInfo(idStatus: number): { label: string; classe: string } {
   return { label: item?.label ?? "-", classe: classes[idStatus] ?? "pendente" };
 }
 
+function pad3(valor: number): string {
+  return String(valor).padStart(3, "0");
+}
+
 interface ContaPagarPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -70,6 +93,34 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("conta-pagar", COLUNAS_PADRAO)
   );
+
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
+  const [parcelasPorConta, setParcelasPorConta] = useState<Record<number, ParcelaContaPagar[]>>({});
+  const [carregandoParcelas, setCarregandoParcelas] = useState<Set<number>>(new Set());
+
+  async function alternarExpandir(idContaPagar: number) {
+    const estavaExpandido = expandidos.has(idContaPagar);
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (estavaExpandido) novo.delete(idContaPagar);
+      else novo.add(idContaPagar);
+      return novo;
+    });
+
+    if (estavaExpandido || parcelasPorConta[idContaPagar]) return;
+
+    setCarregandoParcelas((atual) => new Set(atual).add(idContaPagar));
+    try {
+      const dados = await obterContaPagar(idContaPagar);
+      setParcelasPorConta((atual) => ({ ...atual, [idContaPagar]: dados.parcelas }));
+    } finally {
+      setCarregandoParcelas((atual) => {
+        const novo = new Set(atual);
+        novo.delete(idContaPagar);
+        return novo;
+      });
+    }
+  }
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -205,6 +256,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
         <table className="conta-pagar-tabela">
           <thead>
             <tr>
+              <th className="conta-pagar-col-expandir"></th>
               {colunasVisiveis.has("id") && <th>ID</th>}
               {colunasVisiveis.has("numeroDocumento") && <th>Documento</th>}
               {colunasVisiveis.has("descricao") && <th>Descrição</th>}
@@ -220,19 +272,32 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
           <tbody>
             {carregando ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="conta-pagar-vazio">Carregando...</td>
+                <td colSpan={colunasVisiveis.size + 2} className="conta-pagar-vazio">Carregando...</td>
               </tr>
             ) : contasPagina.length === 0 ? (
               <tr>
-                <td colSpan={colunasVisiveis.size + 1} className="conta-pagar-vazio">
+                <td colSpan={colunasVisiveis.size + 2} className="conta-pagar-vazio">
                   Nenhuma conta a pagar encontrada
                 </td>
               </tr>
             ) : (
               contasPagina.map((c) => {
                 const { label, classe } = statusInfo(c.IdStatusContaPagar);
+                const expandido = expandidos.has(c.idContaPagar);
+                const parcelas = parcelasPorConta[c.idContaPagar];
                 return (
-                  <tr key={c.idContaPagar}>
+                  <Fragment key={c.idContaPagar}>
+                  <tr>
+                    <td className="conta-pagar-col-expandir">
+                      <button
+                        type="button"
+                        className={`conta-pagar-btn-expandir ${expandido ? "aberto" : ""}`}
+                        title={expandido ? "Ocultar parcelas" : "Ver parcelas"}
+                        onClick={() => alternarExpandir(c.idContaPagar)}
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </td>
                     {colunasVisiveis.has("id") && <td>{c.idContaPagar}</td>}
                     {colunasVisiveis.has("numeroDocumento") && <td>{c.NumeroDocumento || "-"}</td>}
                     {colunasVisiveis.has("descricao") && <td>{c.Descricao}</td>}
@@ -271,6 +336,54 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                       )}
                     </td>
                   </tr>
+                  {expandido && (
+                    <tr className="conta-pagar-linha-expandida">
+                      <td colSpan={colunasVisiveis.size + 2} className="conta-pagar-parcelas-celula">
+                        {carregandoParcelas.has(c.idContaPagar) ? (
+                          <div className="conta-pagar-parcelas-estado">Carregando parcelas...</div>
+                        ) : !parcelas || parcelas.length === 0 ? (
+                          <div className="conta-pagar-parcelas-estado">Nenhuma parcela nesta conta.</div>
+                        ) : (
+                          <div className="conta-pagar-form-parcelas-tabela-wrapper">
+                            <table className="conta-pagar-form-parcelas-tabela">
+                              <thead>
+                                <tr>
+                                  <th>Nº</th>
+                                  <th>Vencimento</th>
+                                  <th className="conta-pagar-col-valor">Valor</th>
+                                  <th className="conta-pagar-col-valor">Pago</th>
+                                  <th>Data Pagamento</th>
+                                  <th>Tipo Pagamento</th>
+                                  <th>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {parcelas.map((p) => {
+                                  const infoParcela = statusInfo(p.IdStatusParcela);
+                                  return (
+                                    <tr key={p.IdContaPagarParcela}>
+                                      <td>{pad3(p.NumeroParcela)}</td>
+                                      <td>{formatarData(p.DataVencimento)}</td>
+                                      <td className="conta-pagar-col-valor">{formatarValor(p.ValorParcela)}</td>
+                                      <td className="conta-pagar-col-valor">{formatarValor(p.ValorPago)}</td>
+                                      <td>{p.DataPagamento ? formatarData(p.DataPagamento) : "-"}</td>
+                                      <td>{p.DescricaoTipoPagamento || "-"}</td>
+                                      <td>
+                                        <span className={`conta-pagar-badge ${infoParcela.classe}`}>
+                                          {infoParcela.label.toUpperCase()}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             )}
