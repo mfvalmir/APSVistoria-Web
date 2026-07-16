@@ -13,6 +13,10 @@ const config: sql.config = {
   options: {
     encrypt: process.env.DB_ENCRYPT === "true", // true é obrigatório em produção/internet
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === "true",
+    // driver por padrão trata datetime como UTC (useUTC: true), mas o banco guarda
+    // horário local (Brasília) - com isso as leituras vinham 3h atrasadas e as
+    // gravações de "new Date()" (dataAlteracao etc.) 3h adiantadas.
+    useUTC: false,
   },
   pool: {
     max: 10,
