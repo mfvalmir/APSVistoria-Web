@@ -71,9 +71,16 @@ export interface BairroOpcao {
   UF: string | null;
 }
 
-export async function buscarFuncionarios(busca: string, semUsuario = false): Promise<FuncionarioResumo[]> {
+export async function buscarFuncionarios(
+  busca: string,
+  opcoes?: { semUsuario?: boolean; somenteVistoriador?: boolean }
+): Promise<FuncionarioResumo[]> {
   const { data } = await api.get<FuncionarioResumo[]>("/funcionarios/buscar", {
-    params: { busca, semUsuario: semUsuario ? "1" : undefined },
+    params: {
+      busca,
+      semUsuario: opcoes?.semUsuario ? "1" : undefined,
+      somenteVistoriador: opcoes?.somenteVistoriador ? "1" : undefined,
+    },
   });
   return data;
 }

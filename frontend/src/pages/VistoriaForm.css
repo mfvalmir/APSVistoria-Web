@@ -1,0 +1,14 @@
+.vistoria-form-campo-documento {
+  flex: 0 0 180px;
+  min-width: 180px;
+}
+
+.vistoria-form-dica-travado {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--cor-fundo-secundario);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-size: 13px;
+}

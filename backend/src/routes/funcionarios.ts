@@ -16,10 +16,12 @@ const SELECT_BASE = `
   LEFT JOIN Banco bc ON bc.idBanco = f.IDBanco
 `;
 
-// GET /funcionarios/buscar?busca=&semUsuario=1 - combobox leve (usado pelo form de Usuário)
+// GET /funcionarios/buscar?busca=&semUsuario=1&somenteVistoriador=1 - combobox leve
+// (usado pelo form de Usuário e pelo combobox de Vistoriador no form de Vistoria)
 router.get("/buscar", authMiddleware, async (req, res) => {
   const busca = (req.query.busca as string | undefined)?.trim();
   const semUsuario = req.query.semUsuario === "1";
+  const somenteVistoriador = req.query.somenteVistoriador === "1";
 
   try {
     const pool = await getPool();
@@ -32,6 +34,9 @@ router.get("/buscar", authMiddleware, async (req, res) => {
     }
     if (semUsuario) {
       condicoes.push("NOT EXISTS (SELECT 1 FROM usuario u WHERE u.IDFuncionario = f.IdFuncionario)");
+    }
+    if (somenteVistoriador) {
+      condicoes.push("f.FazVistoria = 1");
     }
 
     const result = await request.query(

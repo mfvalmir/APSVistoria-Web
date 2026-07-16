@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { ConnectionPool, Transaction } from "mssql";
 import { getPool, sql } from "../db";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { parseDataLocal } from "../utils/data";
 
 // Executor genérico: tanto o pool quanto uma transação expõem .request(),
 // usado pelas duas procedures chamadas juntas na baixa manual de parcela.
@@ -21,7 +22,7 @@ const SELECT_BASE = `
     cr.idUsuarioEmissao, cr.idUsuarioAlteracao, cr.DataAlteracao
   FROM ContaReceber cr
   LEFT JOIN Cliente cli ON cli.idCliente = cr.idCliente
-  JOIN Categoria c ON c.IdCategoria = cr.idCategoria
+  LEFT JOIN Categoria c ON c.IdCategoria = cr.idCategoria
   LEFT JOIN TipoPagamento tp ON tp.idTipoPagamento = cr.IdPrimeiroTipoPagamento
 `;
 
@@ -273,10 +274,10 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
       valorTotal,
       totalParcelas,
       idStatusContaReceber: idStatusContaReceber ?? 0,
-      dataEmissao: new Date(dataEmissao),
+      dataEmissao: parseDataLocal(dataEmissao),
       observacao: observacao || null,
       idUsuarioEmissao: req.user!.id,
-      primeiroVencimento: primeiroVencimento ? new Date(primeiroVencimento) : null,
+      primeiroVencimento: primeiroVencimento ? parseDataLocal(primeiroVencimento) : null,
       idPrimeiroTipoPagamento: idPrimeiroTipoPagamento || null,
       mesesIntervalo: intervaloMeses || 1,
       idUsuarioBaixa: req.user!.id,
@@ -341,12 +342,12 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       valorTotal,
       totalParcelas,
       idStatusContaReceber: idStatusContaReceber ?? 0,
-      dataEmissao: new Date(dataEmissao),
+      dataEmissao: parseDataLocal(dataEmissao),
       observacao: observacao || null,
       idUsuarioEmissao: atual.recordset[0].idUsuarioEmissao,
       idUsuarioAlteracao: req.user!.id,
       dataAlteracao: new Date(),
-      primeiroVencimento: primeiroVencimento ? new Date(primeiroVencimento) : null,
+      primeiroVencimento: primeiroVencimento ? parseDataLocal(primeiroVencimento) : null,
       idPrimeiroTipoPagamento: idPrimeiroTipoPagamento || null,
       mesesIntervalo: intervaloMeses || 1,
       idUsuarioBaixa: req.user!.id,
@@ -453,7 +454,7 @@ router.post("/:idConta/parcelas/:idParcela/baixa", authMiddleware, async (req: A
         valorMulta: multa,
         valorPago,
         dataVencimento: parcela.DataVencimento,
-        dataPagamento: new Date(dataPagamento),
+        dataPagamento: parseDataLocal(dataPagamento),
         idTipoPagamento: idTipoPagamento || null,
         idStatusParcela: 1,
         observacao,

@@ -21,6 +21,7 @@ import contaPagarRouter from "./routes/contaPagar";
 import contaReceberRouter from "./routes/contaReceber";
 import caixaRouter from "./routes/caixa";
 import dashboardRouter from "./routes/dashboard";
+import vistoriaRouter from "./routes/vistoria";
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use("/conta-pagar", contaPagarRouter);
 app.use("/conta-receber", contaReceberRouter);
 app.use("/caixa", caixaRouter);
 app.use("/dashboard", dashboardRouter);
+app.use("/vistoria", vistoriaRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", banco: process.env.DB_NAME });

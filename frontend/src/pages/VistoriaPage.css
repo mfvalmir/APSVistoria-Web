@@ -1,0 +1,345 @@
+.vistoria-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vistoria-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vistoria-btn-voltar {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vistoria-btn-voltar:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-busca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--cor-fundo-secundario);
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 360px;
+  color: var(--cor-texto-fraco);
+}
+
+.vistoria-busca input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--cor-texto);
+  font-size: 14px;
+  width: 100%;
+}
+
+.vistoria-busca-limpar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--cor-texto-fraco);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.vistoria-busca-limpar:hover {
+  color: var(--cor-texto);
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-filtro-status {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  font-size: 14px;
+}
+
+.vistoria-toolbar-espaco {
+  flex: 1;
+}
+
+.vistoria-btn-criar {
+  background: var(--cor-marca);
+  color: var(--cor-marca-texto);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.vistoria-btn-criar:hover {
+  background: var(--cor-marca-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.vistoria-btn-criar:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.vistoria-tabela-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+}
+
+.vistoria-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.vistoria-tabela th {
+  text-align: left;
+  padding: 12px 16px;
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto-titulo);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cor-borda);
+  white-space: nowrap;
+}
+
+.vistoria-tabela th.vistoria-col-status,
+.vistoria-tabela th.vistoria-col-acoes {
+  text-align: center;
+}
+
+.vistoria-tabela th.vistoria-col-valor {
+  text-align: right;
+}
+
+.vistoria-tabela td {
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+.vistoria-tabela td.vistoria-col-valor {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vistoria-tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.vistoria-tabela tbody tr:nth-child(even) {
+  background: var(--cor-fundo-secundario);
+}
+
+.vistoria-tabela tbody tr:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-vazio {
+  text-align: center;
+  color: var(--cor-texto-fraco);
+  padding: 24px !important;
+}
+
+/* Badges de status (.conta-receber-badge) e os ícones de baixa/estorno da grade de
+   parcelas (.conta-receber-icone-acao/.conta-receber-col-valor/.conta-receber-col-acoes)
+   são reaproveitados de ContaReceberPage.css/ContaReceberForm.css de propósito - a "parcela
+   de vistoria" é literalmente uma ContaReceberParcela (ver backend/src/routes/vistoria.ts),
+   e VistoriaPage/VistoriaForm reaproveitam ContaReceberBaixaModal/EstornoModal como estão,
+   então manter a mesma linguagem visual evita duplicar CSS. Ambos os arquivos já são
+   carregados globalmente (App.tsx importa ContaReceberPage.tsx estaticamente). */
+
+.vistoria-col-expandir {
+  width: 1%;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+}
+
+.vistoria-btn-expandir {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vistoria-btn-expandir:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-btn-expandir svg {
+  transition: transform 0.15s ease;
+}
+
+.vistoria-btn-expandir.aberto svg {
+  transform: rotate(180deg);
+}
+
+.vistoria-linha-expandida td {
+  background: var(--cor-fundo-secundario);
+  padding: 14px 16px !important;
+}
+
+.vistoria-tabela tbody tr.vistoria-linha-pai-expandida td {
+  background: var(--cor-fundo-secundario);
+  font-weight: 700;
+}
+
+.vistoria-tabela tbody tr.vistoria-linha-pai-expandida-pendente td {
+  color: #c8860d;
+}
+
+.vistoria-tabela tbody tr.vistoria-linha-pai-expandida-pago td {
+  color: #2f9e46;
+}
+
+.vistoria-tabela tbody tr.vistoria-linha-pai-expandida-parcial td {
+  color: #2f8fd9;
+}
+
+.vistoria-tabela tbody tr.vistoria-linha-pai-expandida-cancelado td {
+  color: var(--cor-erro);
+}
+
+.vistoria-parcelas-celula {
+  white-space: normal;
+}
+
+.vistoria-parcelas-estado {
+  text-align: center;
+  color: var(--cor-texto-fraco);
+  padding: 12px;
+}
+
+.vistoria-col-status {
+  text-align: center;
+}
+
+.vistoria-col-acoes {
+  white-space: nowrap;
+  width: 1%;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.vistoria-icone-acao {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px;
+  margin-right: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vistoria-icone-acao:last-child {
+  margin-right: 0;
+}
+
+.vistoria-icone-acao:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-icone-acao:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.vistoria-icone-acao:disabled:hover {
+  background: var(--cor-fundo);
+}
+
+.vistoria-icone-acao.editar {
+  color: #c8860d;
+  border-color: #c8860d44;
+}
+
+.vistoria-icone-acao.editar:hover {
+  background: #c8860d1a;
+}
+
+.vistoria-icone-acao.perigo {
+  color: #e02020;
+  border-color: #e0202044;
+}
+
+.vistoria-icone-acao.perigo:hover {
+  background: #e020201a;
+}
+
+.vistoria-icone-acao.estorno {
+  color: #a06b00;
+  border-color: #a06b0044;
+}
+
+.vistoria-icone-acao.estorno:hover {
+  background: #a06b001a;
+}
+
+.vistoria-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--cor-texto-fraco);
+}
+
+.vistoria-paginacao {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vistoria-paginacao button {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.vistoria-paginacao button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.vistoria-paginacao button.ativa {
+  background: var(--cor-marca);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca-texto);
+}

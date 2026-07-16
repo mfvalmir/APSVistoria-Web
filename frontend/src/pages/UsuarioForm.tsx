@@ -52,7 +52,7 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
       return;
     }
     const timeout = setTimeout(() => {
-      buscarFuncionarios(nomeFuncionario, true).then(setSugestoes);
+      buscarFuncionarios(nomeFuncionario, { semUsuario: true }).then(setSugestoes);
     }, 250);
     return () => clearTimeout(timeout);
   }, [nomeFuncionario, modoEdicao]);

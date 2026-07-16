@@ -16,6 +16,7 @@ import FornecedorPage from "./pages/FornecedorPage";
 import ContaPagarPage from "./pages/ContaPagarPage";
 import ContaReceberPage from "./pages/ContaReceberPage";
 import CaixaPage from "./pages/CaixaPage";
+import VistoriaPage from "./pages/VistoriaPage";
 import Placeholder from "./pages/Placeholder";
 import Inicio from "./pages/Inicio";
 import { decodeToken } from "./utils/jwt";
@@ -211,6 +212,16 @@ function App() {
         if (rota === "caixa") {
           return (
             <CaixaPage
+              permissoes={permissoes}
+              administrador={administradorLogado()}
+              navegarPara={navegarPara}
+              voltarInicio={irParaInicio}
+            />
+          );
+        }
+        if (rota === "vistoria") {
+          return (
+            <VistoriaPage
               permissoes={permissoes}
               administrador={administradorLogado()}
               navegarPara={navegarPara}
