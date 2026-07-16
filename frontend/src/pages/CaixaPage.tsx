@@ -80,6 +80,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
 
   const [caixas, setCaixas] = useState<Caixa[]>([]);
+  const [existeCaixaAberto, setExisteCaixaAberto] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<FiltroStatus>("aberto");
@@ -131,8 +132,14 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
   async function carregar() {
     setCarregando(true);
     try {
-      const dados = await listarCaixas(busca || undefined, status, dataInicial || undefined, dataFinal || undefined);
+      // Independente do filtro de status escolhido na tela, sempre confere se já existe algum
+      // caixa aberto - usado pra desabilitar "Abrir Caixa" (só pode haver 1 caixa aberto por vez).
+      const [dados, abertos] = await Promise.all([
+        listarCaixas(busca || undefined, status, dataInicial || undefined, dataFinal || undefined),
+        listarCaixas(undefined, "aberto"),
+      ]);
       setCaixas(dados);
+      setExisteCaixaAberto(abertos.length > 0);
     } finally {
       setCarregando(false);
     }
@@ -236,7 +243,12 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
         <div className="caixa-toolbar-espaco" />
 
         {podeAdicionar && (
-          <button className="caixa-btn-criar" onClick={abrirCriacao}>
+          <button
+            className="caixa-btn-criar"
+            onClick={abrirCriacao}
+            disabled={existeCaixaAberto}
+            title={existeCaixaAberto ? "Já existe um caixa aberto - feche-o antes de abrir outro" : undefined}
+          >
             Abrir Caixa
           </button>
         )}

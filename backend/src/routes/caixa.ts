@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool, sql } from "../db";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { parseDataLocal } from "../utils/data";
 
 const router = Router();
 
@@ -135,7 +136,7 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
 
     const idCaixa = await chamarManterCaixa(pool, {
       acao: "O",
-      dataAbertura: dataAbertura ? new Date(dataAbertura) : null,
+      dataAbertura: dataAbertura ? parseDataLocal(dataAbertura) : null,
       saldoInicial: saldoInicial || 0,
       idUsuarioAbertura: req.user!.id,
       observacao: observacao || "",
@@ -168,7 +169,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
     await chamarManterCaixa(pool, {
       acao: "A",
       idCaixa: Number(req.params.id),
-      dataAbertura: dataAbertura ? new Date(dataAbertura) : null,
+      dataAbertura: dataAbertura ? parseDataLocal(dataAbertura) : null,
       saldoInicial: saldoInicial || 0,
       idUsuarioAbertura: atual.recordset[0].idUsuarioAbertura,
       observacao: observacao || "",
@@ -210,8 +211,11 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 
 // POST /caixa/:id/fechar - fecha o caixa (Manter_Caixa @acao='F')
 router.post("/:id/fechar", authMiddleware, async (req: AuthRequest, res) => {
-  const { saldoFinal, observacao } = req.body;
+  const { dataFechamento, saldoFinal, observacao } = req.body;
 
+  if (!dataFechamento) {
+    return res.status(400).json({ erro: "dataFechamento é obrigatório" });
+  }
   if (saldoFinal === undefined || saldoFinal === null) {
     return res.status(400).json({ erro: "saldoFinal é obrigatório" });
   }
@@ -219,13 +223,27 @@ router.post("/:id/fechar", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const pool = await getPool();
 
+    // Manter_Caixa, no acao='F', concatena @Observacao no texto existente com " | " (sem
+    // quebra de linha). O frontend já manda o texto final pronto (com carimbo de data/hora e
+    // quebra de linha, no mesmo formato usado ao editar o caixa aberto - ver CaixaForm.tsx),
+    // então aqui passamos null pra procedure não mexer em Observacao, e gravamos o texto
+    // definitivo direto, numa instrução separada.
     await chamarManterCaixa(pool, {
       acao: "F",
       idCaixa: Number(req.params.id),
+      dataFechamento: parseDataLocal(dataFechamento),
       saldoFinal,
       idUsuarioFechamento: req.user!.id,
-      observacao: observacao || null,
+      observacao: null,
     });
+
+    if (observacao) {
+      await pool
+        .request()
+        .input("id", sql.Int, req.params.id)
+        .input("observacao", sql.VarChar(sql.MAX), observacao)
+        .query("UPDATE Caixa SET Observacao = @observacao WHERE idCaixa = @id");
+    }
 
     res.json({ mensagem: "Caixa fechado com sucesso" });
   } catch (err: any) {

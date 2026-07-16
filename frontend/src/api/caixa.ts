@@ -74,6 +74,11 @@ export async function excluirCaixa(id: number): Promise<void> {
   await api.delete(`/caixa/${id}`);
 }
 
-export async function fecharCaixa(id: number, saldoFinal: number, observacao?: string): Promise<void> {
-  await api.post(`/caixa/${id}/fechar`, { saldoFinal, observacao });
+export async function fecharCaixa(
+  id: number,
+  dataFechamento: string,
+  saldoFinal: number,
+  observacao?: string
+): Promise<void> {
+  await api.post(`/caixa/${id}/fechar`, { dataFechamento, saldoFinal, observacao });
 }

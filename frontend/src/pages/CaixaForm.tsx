@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, Send, Lock } from "lucide-react";
-import { obterCaixa, abrirCaixa, atualizarCaixa, MovimentoCaixa, ORIGEM_MOVIMENTO } from "../api/caixa";
+import { ArrowLeft, Send, Lock, Plus } from "lucide-react";
+import { obterCaixa, abrirCaixa, atualizarCaixa, listarCaixas, MovimentoCaixa, ORIGEM_MOVIMENTO } from "../api/caixa";
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { ItemMenu } from "../api/menu";
 import { decodeToken } from "../utils/jwt";
@@ -67,12 +67,15 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
   const usuario = usuarioLogado();
 
   const [dataAbertura, setDataAbertura] = useState(hoje());
+  const [dataAberturaCompleta, setDataAberturaCompleta] = useState<string | null>(null);
   const [saldoInicial, setSaldoInicial] = useState("");
   const [nomeUsuarioAbertura, setNomeUsuarioAbertura] = useState("");
   const [dataFechamento, setDataFechamento] = useState<string | null>(null);
   const [saldoFinal, setSaldoFinal] = useState<number | null>(null);
   const [nomeUsuarioFechamento, setNomeUsuarioFechamento] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [novaObservacao, setNovaObservacao] = useState("");
+  const observacaoRef = useRef<HTMLTextAreaElement>(null);
 
   const [movimentos, setMovimentos] = useState<MovimentoCaixa[]>([]);
 
@@ -88,6 +91,7 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
     if (id === null) return;
     const c = await obterCaixa(id);
     setDataAbertura(paraInputDate(c.DataAbertura));
+    setDataAberturaCompleta(c.DataAbertura);
     setSaldoInicial(numeroParaMoeda(c.SaldoInicial));
     setNomeUsuarioAbertura(c.NomeUsuarioAbertura || "");
     setDataFechamento(c.DataFechamento);
@@ -103,6 +107,37 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, modoEdicao]);
 
+  // Ao abrir um caixa novo, sugere como Saldo Inicial o Saldo Final do último caixa fechado
+  // (o dinheiro que sobrou de um caixa normalmente vira o início do próximo).
+  useEffect(() => {
+    if (modoEdicao) return;
+    listarCaixas(undefined, "fechado").then((fechados) => {
+      if (fechados.length > 0 && fechados[0].SaldoFinal !== null) {
+        setSaldoInicial(numeroParaMoeda(fechados[0].SaldoFinal));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoEdicao]);
+
+  // O textarea de Observações é somente leitura (nunca editado direto, pra não perder
+  // histórico por engano) - a altura acompanha o texto acumulado, sem barra de rolagem.
+  useEffect(() => {
+    if (!observacaoRef.current) return;
+    observacaoRef.current.style.height = "auto";
+    observacaoRef.current.style.height = `${observacaoRef.current.scrollHeight}px`;
+  }, [observacao]);
+
+  // Única forma de alterar Observações: acrescentar uma nova nota (nunca sobrescrever), sempre
+  // com carimbo de data/hora na frente - a mais recente entra no topo, cada uma em sua própria
+  // linha.
+  function adicionarObservacao() {
+    const texto = novaObservacao.trim();
+    if (!texto) return;
+    const linha = `${new Date().toLocaleString("pt-BR")} - ${texto}`;
+    setObservacao((atual) => (atual ? `${linha}\n${atual}` : linha));
+    setNovaObservacao("");
+  }
+
   async function handleFechado() {
     setMostrarFechar(false);
     await carregarCaixa();
@@ -111,11 +146,6 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
-
-    if (!dataAbertura) {
-      setErro("Informe a data de abertura");
-      return;
-    }
 
     const dados = {
       dataAbertura,
@@ -163,16 +193,15 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
       <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
         <div className="usuario-form-linha">
           <div className="usuario-form-campo caixa-form-campo-data">
-            <label htmlFor="cx-data-abertura">
-              Data Abertura <span className="obrigatorio">*</span>
-            </label>
+            <label>Data Abertura</label>
             <input
-              id="cx-data-abertura"
-              type="date"
-              value={dataAbertura}
-              onChange={(e) => setDataAbertura(e.target.value)}
-              disabled={!aberto}
-              required
+              value={
+                dataAberturaCompleta
+                  ? new Date(dataAberturaCompleta).toLocaleString("pt-BR")
+                  : new Date().toLocaleString("pt-BR")
+              }
+              disabled
+              readOnly
             />
           </div>
 
@@ -184,7 +213,7 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
               onChange={(e) => setSaldoInicial(formatarMoeda(e.target.value))}
               placeholder="R$ 0,00"
               inputMode="numeric"
-              disabled={!aberto}
+              disabled={modoEdicao}
             />
           </div>
 
@@ -219,12 +248,37 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
           <label htmlFor="cx-observacao">Observações</label>
           <textarea
             id="cx-observacao"
-            className="caixa-form-textarea"
+            ref={observacaoRef}
+            className="caixa-form-textarea caixa-form-textarea-auto"
             value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-            rows={3}
-            disabled={!aberto}
+            rows={1}
+            disabled
+            readOnly
           />
+          {aberto && (
+            <div className="usuario-form-campo-com-acao caixa-form-nova-observacao">
+              <input
+                value={novaObservacao}
+                onChange={(e) => setNovaObservacao(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    adicionarObservacao();
+                  }
+                }}
+                placeholder="Adicionar observação..."
+              />
+              <button
+                type="button"
+                className="usuario-form-btn-navegar"
+                title="Adicionar observação"
+                onClick={adicionarObservacao}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
         {erro && <div className="usuario-form-erro">{erro}</div>}
@@ -295,6 +349,9 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
       {mostrarFechar && id !== null && (
         <CaixaFecharModal
           idCaixa={id}
+          saldoInicial={moedaParaNumero(saldoInicial)}
+          movimentos={movimentos}
+          observacaoAtual={observacao}
           onCancelar={() => setMostrarFechar(false)}
           onFechado={handleFechado}
         />

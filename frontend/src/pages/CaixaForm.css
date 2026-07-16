@@ -14,6 +14,16 @@
   border-color: var(--cor-marca);
 }
 
+.caixa-form-textarea-auto {
+  resize: none;
+  overflow: hidden;
+  min-height: 42px;
+}
+
+.caixa-form-nova-observacao {
+  margin-top: 8px;
+}
+
 .caixa-form-campo-data {
   flex: 0 0 200px;
   min-width: 200px;
