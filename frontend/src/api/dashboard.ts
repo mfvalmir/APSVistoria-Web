@@ -38,6 +38,12 @@ export interface DashboardVistoriasPorMes {
   faturamento: number;
 }
 
+export interface DashboardTipoPagamento {
+  tipo: string;
+  quantidade: number;
+  valor: number;
+}
+
 export interface Dashboard {
   caixa: DashboardCaixa;
   aReceberAberto: number;
@@ -50,6 +56,7 @@ export interface Dashboard {
   };
   fluxoCaixa: DashboardFluxoCaixaDia[];
   vistoriasPorMes: DashboardVistoriasPorMes[];
+  tiposPagamento: DashboardTipoPagamento[];
 }
 
 export async function buscarDashboard(): Promise<Dashboard> {

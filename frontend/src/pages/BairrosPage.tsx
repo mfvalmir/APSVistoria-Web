@@ -5,12 +5,18 @@ import { listarBairros, excluirBairro, Bairro } from "../api/bairros";
 import { ItemMenu } from "../api/menu";
 import BairroForm from "./BairroForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./BairrosPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -31,6 +37,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -42,6 +49,10 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("bairros", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("bairros"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -51,6 +62,12 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
       salvarColunasVisiveis("bairros", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("bairros", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -74,15 +91,16 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
   }, [busca, subView]);
 
   async function handleExcluir(bairro: Bairro) {
-    if (!window.confirm(`Excluir o bairro "${bairro.DescricaoBairro}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir o bairro "${bairro.DescricaoBairro}"?`, perigo: true }))) return;
     try {
       await excluirBairro(bairro.IDBairro);
       carregar();
+      mostrarToast("Bairro excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o bairro");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o bairro", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -106,9 +124,25 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
     return <BairroForm id={idSelecionado} onVoltar={voltarParaLista} navegarPara={navegarPara} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(bairros.length / ITENS_POR_PAGINA));
+  const bairrosOrdenados = ordenarLista(bairros, ordenacao, {
+    id: (b) => b.IDBairro,
+    bairro: (b) => b.DescricaoBairro,
+    cidade: (b) => b.DescricaoCidade || "",
+    uf: (b) => b.UF || "",
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Bairro>(COLUNAS, colunasVisiveis, {
+    id: (b) => String(b.IDBairro),
+    bairro: (b) => b.DescricaoBairro,
+    cidade: (b) => b.DescricaoCidade || "-",
+    uf: (b) => b.UF || "-",
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(bairrosOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const bairrosPagina = bairros.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const bairrosPagina = bairrosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="bairros-page">
@@ -117,6 +151,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
           type="button"
           className="bairros-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -132,6 +167,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
               type="button"
               className="bairros-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -141,6 +177,15 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
 
         <div className="bairros-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="bairros"
+            titulo="Bairros"
+            dados={bairrosOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="bairros-btn-criar" onClick={abrirCriacao}>
             Criar Bairro
@@ -148,19 +193,40 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
         )}
       </div>
 
-      <div className="bairros-tabela-wrapper">
+      <div className={`bairros-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="bairros-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("bairro") && <th>Bairro</th>}
-              {colunasVisiveis.has("cidade") && <th>Cidade</th>}
-              {colunasVisiveis.has("uf") && <th className="bairros-col-uf">UF</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("bairro") && (
+                <ThOrdenavel campo="bairro" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Bairro
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("cidade") && (
+                <ThOrdenavel campo="cidade" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Cidade
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("uf") && (
+                <ThOrdenavel
+                  campo="uf"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="bairros-col-uf"
+                >
+                  UF
+                </ThOrdenavel>
+              )}
               <th className="bairros-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && bairrosPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="bairros-vazio">Carregando...</td>
               </tr>
@@ -180,6 +246,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
                       <button
                         className="bairros-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(b.IDBairro)}
                       >
                         <Pencil size={16} />
@@ -189,6 +256,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
                       <button
                         className="bairros-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(b)}
                       >
                         <Trash2 size={16} />
@@ -204,6 +272,7 @@ function BairrosPage({ permissoes, navegarPara, voltarInicio }: BairrosPageProps
 
       <div className="bairros-rodape">
         <span>{bairros.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="bairros-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

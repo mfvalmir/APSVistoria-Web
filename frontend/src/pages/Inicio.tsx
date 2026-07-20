@@ -33,7 +33,7 @@ function Inicio() {
     return <div className="inicio-pagina inicio-erro">{erro || "Sem dados."}</div>;
   }
 
-  const { caixa, aReceberAberto, aPagarAberto, vistoriasMes, alertas, fluxoCaixa, vistoriasPorMes } = dados;
+  const { caixa, aReceberAberto, aPagarAberto, vistoriasMes, alertas, fluxoCaixa, vistoriasPorMes, tiposPagamento } = dados;
 
   return (
     <div className="inicio-pagina">
@@ -138,6 +138,12 @@ function Inicio() {
           titulo="Faturamento de vistorias por mês"
           dados={vistoriasPorMes.map((m) => ({ rotulo: m.rotulo, valor: m.faturamento }))}
           cor="sequencial-2"
+          formatarValor={formatarValor}
+        />
+        <BarraMensal
+          titulo="Comparação de tipos de pagamento (mês atual)"
+          dados={tiposPagamento.map((t) => ({ rotulo: t.tipo, valor: t.valor }))}
+          cor="sequencial-3"
           formatarValor={formatarValor}
         />
       </div>

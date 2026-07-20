@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarFuncionarios, desativarFuncionario, Funcionario } from "../api/funcionarios";
 import { ItemMenu } from "../api/menu";
 import FuncionarioForm from "./FuncionarioForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./FuncionariosPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -31,6 +38,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -43,6 +51,10 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("funcionarios", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("funcionarios"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -52,6 +64,12 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
       salvarColunasVisiveis("funcionarios", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("funcionarios", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -75,9 +93,21 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
   }, [busca, status, subView]);
 
   async function handleExcluir(funcionario: Funcionario) {
-    if (!window.confirm(`Desativar o funcionário "${funcionario.NomeFuncionario}"?`)) return;
-    await desativarFuncionario(funcionario.IdFuncionario);
-    carregar();
+    if (
+      !(await confirmar({ mensagem: `Desativar o funcionário "${funcionario.NomeFuncionario}"?`, perigo: true }))
+    )
+      return;
+    try {
+      await desativarFuncionario(funcionario.IdFuncionario);
+      carregar();
+      mostrarToast("Funcionário desativado com sucesso", "sucesso");
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        mostrarToast(err.response.data?.erro || "Não foi possível desativar o funcionário", "erro");
+      } else {
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
+      }
+    }
   }
 
   function abrirCriacao() {
@@ -99,11 +129,26 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
     return <FuncionarioForm id={idSelecionado} onVoltar={voltarParaLista} navegarPara={navegarPara} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(funcionarios.length / ITENS_POR_PAGINA));
+  const funcionariosOrdenados = ordenarLista(funcionarios, ordenacao, {
+    id: (f) => f.IdFuncionario,
+    nome: (f) => f.NomeFuncionario,
+    funcao: (f) => f.Funcao || "",
+    telefone: (f) => f.TelCelular || f.TelResidencial || "",
+    status: (f) => f.Situacao.trim(),
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Funcionario>(COLUNAS, colunasVisiveis, {
+    id: (f) => String(f.IdFuncionario),
+    nome: (f) => f.NomeFuncionario,
+    funcao: (f) => f.Funcao || "-",
+    telefone: (f) => f.TelCelular || f.TelResidencial || "-",
+    status: (f) => (f.Situacao.trim() === "A" ? "ATIVO" : "INATIVO"),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(funcionariosOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const funcionariosPagina = funcionarios.slice(
-    (paginaAtual - 1) * ITENS_POR_PAGINA,
-    paginaAtual * ITENS_POR_PAGINA
+  const funcionariosPagina = funcionariosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
   );
 
   return (
@@ -113,6 +158,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
           type="button"
           className="funcionarios-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -132,6 +178,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
               type="button"
               className="funcionarios-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -151,6 +198,15 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
 
         <div className="funcionarios-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="funcionarios"
+            titulo="Funcionários"
+            dados={funcionariosOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="funcionarios-btn-criar" onClick={abrirCriacao}>
             Criar Funcionário
@@ -158,20 +214,45 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
         )}
       </div>
 
-      <div className="funcionarios-tabela-wrapper">
+      <div className={`funcionarios-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="funcionarios-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("nome") && <th>Nome</th>}
-              {colunasVisiveis.has("funcao") && <th>Função</th>}
-              {colunasVisiveis.has("telefone") && <th>Telefone</th>}
-              {colunasVisiveis.has("status") && <th className="funcionarios-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("nome") && (
+                <ThOrdenavel campo="nome" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Nome
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("funcao") && (
+                <ThOrdenavel campo="funcao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Função
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("telefone") && (
+                <ThOrdenavel campo="telefone" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Telefone
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="funcionarios-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="funcionarios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && funcionariosPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="funcionarios-vazio">Carregando...</td>
               </tr>
@@ -200,6 +281,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
                         <button
                           className="funcionarios-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(f.IdFuncionario)}
                         >
                           <Pencil size={16} />
@@ -209,6 +291,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
                         <button
                           className="funcionarios-icone-acao perigo"
                           title="Desativar"
+                          aria-label="Desativar"
                           onClick={() => handleExcluir(f)}
                         >
                           <Trash2 size={16} />
@@ -225,6 +308,7 @@ function FuncionariosPage({ permissoes, navegarPara, voltarInicio }: Funcionario
 
       <div className="funcionarios-rodape">
         <span>{funcionarios.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="funcionarios-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

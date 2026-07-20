@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Send } from "lucide-react";
 import { obterCidade, criarCidade, atualizarCidade } from "../api/cidades";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 
 interface CidadeFormProps {
@@ -19,6 +20,8 @@ function CidadeForm({ id, onVoltar }: CidadeFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -34,10 +37,11 @@ function CidadeForm({ id, onVoltar }: CidadeFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricaoCidade || !uf) {
-      setErro("Informe a descrição e a UF");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricaoCidade.trim()) novosErros.descricaoCidade = "Informe a descrição";
+    if (!uf.trim()) novosErros.uf = "Informe a UF";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = { descricaoCidade, uf };
 
@@ -45,8 +49,10 @@ function CidadeForm({ id, onVoltar }: CidadeFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarCidade(id, dados);
+        mostrarToast("Cidade atualizada com sucesso", "sucesso");
       } else {
         await criarCidade(dados);
+        mostrarToast("Cidade criada com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -73,34 +79,42 @@ function CidadeForm({ id, onVoltar }: CidadeFormProps) {
         <h2>{modoEdicao ? "Editar Cidade" : "Nova Cidade"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricaoCidade ? "campo-invalido" : ""}`}>
             <label htmlFor="cf-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="cf-descricao"
               value={descricaoCidade}
-              onChange={(e) => setDescricaoCidade(e.target.value)}
+              onChange={(e) => {
+                setDescricaoCidade(e.target.value);
+                if (erros.descricaoCidade) setErros((atual) => ({ ...atual, descricaoCidade: "" }));
+              }}
               placeholder="Digite o nome da cidade"
               maxLength={50}
               required
             />
+            {erros.descricaoCidade && <span className="usuario-form-campo-erro">{erros.descricaoCidade}</span>}
           </div>
 
-          <div className="usuario-form-campo usuario-form-campo-status">
+          <div className={`usuario-form-campo usuario-form-campo-status ${erros.uf ? "campo-invalido" : ""}`}>
             <label htmlFor="cf-uf">
               UF <span className="obrigatorio">*</span>
             </label>
             <input
               id="cf-uf"
               value={uf}
-              onChange={(e) => setUf(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setUf(e.target.value.toUpperCase());
+                if (erros.uf) setErros((atual) => ({ ...atual, uf: "" }));
+              }}
               placeholder="UF"
               maxLength={2}
               required
             />
+            {erros.uf && <span className="usuario-form-campo-erro">{erros.uf}</span>}
           </div>
         </div>
 

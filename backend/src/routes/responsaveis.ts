@@ -48,7 +48,7 @@ router.post("/:clienteId/responsaveis", authMiddleware, async (req, res) => {
     }
 
     // idResponsavel não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("clienteId", sql.Int, req.params.clienteId)
       .input("nomeResponsavel", sql.VarChar, nomeResponsavel)
@@ -56,11 +56,12 @@ router.post("/:clienteId/responsaveis", authMiddleware, async (req, res) => {
       .input("celularResponsavel", sql.VarChar, celularResponsavel || null)
       .query(
         `INSERT INTO Responsavel (idResponsavel, idCliente, NomeResponsavel, DocResponsavel, CelularResponsavel)
+         OUTPUT INSERTED.idResponsavel
          VALUES ((SELECT ISNULL(MAX(idResponsavel), 0) + 1 FROM Responsavel), @clienteId, @nomeResponsavel,
                  @docResponsavel, @celularResponsavel)`
       );
 
-    res.status(201).json({ mensagem: "Responsável criado" });
+    res.status(201).json({ idResponsavel: result.recordset[0].idResponsavel, mensagem: "Responsável criado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar responsável" });

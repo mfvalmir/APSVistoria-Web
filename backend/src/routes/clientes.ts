@@ -30,7 +30,12 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 
     const where = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
-    const result = await request.query(`${SELECT_BASE} ${where} ORDER BY c.idCliente DESC`);
+    // Só limita quando há busca: sem filtro, a ClientesPage depende da lista completa pra
+    // paginar/ordenar no client. Com busca, uma LIKE curta (ex: autocomplete de Responsável
+    // na Vistoria) pode bater em boa parte da tabela (2900+ clientes) - 50 já é mais resultado
+    // do que cabe numa tela, e sobra a dica de digitar mais pra afinar a busca.
+    const selectClientes = busca ? SELECT_BASE.replace("SELECT ", "SELECT TOP 50 ") : SELECT_BASE;
+    const result = await request.query(`${selectClientes} ${where} ORDER BY c.idCliente DESC`);
     res.json(result.recordset);
   } catch (err) {
     console.error(err);

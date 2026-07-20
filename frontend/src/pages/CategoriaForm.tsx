@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Send } from "lucide-react";
 import { obterCategoria, criarCategoria, atualizarCategoria } from "../api/categoria";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 
 interface CategoriaFormProps {
@@ -18,6 +19,8 @@ function CategoriaForm({ id, onVoltar }: CategoriaFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -30,10 +33,10 @@ function CategoriaForm({ id, onVoltar }: CategoriaFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricaoCategoria) {
-      setErro("Informe a descrição");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricaoCategoria.trim()) novosErros.descricaoCategoria = "Informe a descrição";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = { descricaoCategoria };
 
@@ -41,8 +44,10 @@ function CategoriaForm({ id, onVoltar }: CategoriaFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarCategoria(id, dados);
+        mostrarToast("Categoria atualizada com sucesso", "sucesso");
       } else {
         await criarCategoria(dados);
+        mostrarToast("Categoria criada com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -69,20 +74,24 @@ function CategoriaForm({ id, onVoltar }: CategoriaFormProps) {
         <h2>{modoEdicao ? "Editar Categoria" : "Nova Categoria"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricaoCategoria ? "campo-invalido" : ""}`}>
             <label htmlFor="cf-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="cf-descricao"
               value={descricaoCategoria}
-              onChange={(e) => setDescricaoCategoria(e.target.value)}
+              onChange={(e) => {
+                setDescricaoCategoria(e.target.value);
+                if (erros.descricaoCategoria) setErros((atual) => ({ ...atual, descricaoCategoria: "" }));
+              }}
               placeholder="Digite a descrição da categoria"
               maxLength={50}
               required
             />
+            {erros.descricaoCategoria && <span className="usuario-form-campo-erro">{erros.descricaoCategoria}</span>}
           </div>
         </div>
 

@@ -9,6 +9,7 @@ import {
 } from "../api/formularios";
 import { getIcone, NOMES_ICONES } from "../components/iconRegistry";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 import "./FormularioForm.css";
 
@@ -32,6 +33,8 @@ function FormularioForm({ id, onVoltar }: FormularioFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     buscarGrupos().then(setGrupos);
@@ -55,10 +58,10 @@ function FormularioForm({ id, onVoltar }: FormularioFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!nomeFormulario) {
-      setErro("Informe o nome do formulário");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!nomeFormulario.trim()) novosErros.nomeFormulario = "Informe o nome do formulário";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = {
       nomeFormulario,
@@ -72,8 +75,10 @@ function FormularioForm({ id, onVoltar }: FormularioFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarFormulario(id, { ...dados, ativo });
+        mostrarToast("Formulário atualizado com sucesso", "sucesso");
       } else {
         await criarFormulario(dados);
+        mostrarToast("Formulário criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -102,19 +107,23 @@ function FormularioForm({ id, onVoltar }: FormularioFormProps) {
         <h2>{modoEdicao ? "Editar Formulário" : "Novo Formulário"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.nomeFormulario ? "campo-invalido" : ""}`}>
             <label htmlFor="mf-nome">
               Nome <span className="obrigatorio">*</span>
             </label>
             <input
               id="mf-nome"
               value={nomeFormulario}
-              onChange={(e) => setNomeFormulario(e.target.value)}
+              onChange={(e) => {
+                setNomeFormulario(e.target.value);
+                if (erros.nomeFormulario) setErros((atual) => ({ ...atual, nomeFormulario: "" }));
+              }}
               placeholder="frmNomeDaTela"
               required
             />
+            {erros.nomeFormulario && <span className="usuario-form-campo-erro">{erros.nomeFormulario}</span>}
           </div>
 
           <div className="usuario-form-campo">

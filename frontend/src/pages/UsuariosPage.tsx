@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import {
   ArrowLeft,
   Search,
@@ -20,12 +21,18 @@ import UsuarioForm from "./UsuarioForm";
 import UsuarioPerfil from "./UsuarioPerfil";
 import UsuarioSenha from "./UsuarioSenha";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./UsuariosPage.css";
 
 type SubView = "lista" | "form" | "perfil" | "senha";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -46,6 +53,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -58,6 +66,10 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("usuarios", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("usuarios"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const [permissoesPorUsuario, setPermissoesPorUsuario] = useState<Record<number, AplicacaoRepassada[]>>({});
@@ -97,6 +109,12 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
     });
   }
 
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("usuarios", valor);
+    setPagina(1);
+  }
+
   async function carregar() {
     setCarregando(true);
     try {
@@ -118,9 +136,18 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
   }, [busca, status, subView]);
 
   async function handleExcluir(usuario: Usuario) {
-    if (!window.confirm(`Desativar o usuário "${usuario.Loginn}"?`)) return;
-    await desativarUsuario(usuario.IDUser);
-    carregar();
+    if (!(await confirmar({ mensagem: `Desativar o usuário "${usuario.Loginn}"?`, perigo: true }))) return;
+    try {
+      await desativarUsuario(usuario.IDUser);
+      carregar();
+      mostrarToast("Usuário desativado com sucesso", "sucesso");
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        mostrarToast(err.response.data?.erro || "Não foi possível desativar o usuário", "erro");
+      } else {
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
+      }
+    }
   }
 
   function abrirCriacao() {
@@ -161,11 +188,27 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
     return <UsuarioPerfil usuarioId={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(usuarios.length / ITENS_POR_PAGINA));
+  const usuariosOrdenados = ordenarLista(usuarios, ordenacao, {
+    id: (u) => u.IDUser,
+    usuario: (u) => u.Loginn,
+    funcionario: (u) => u.NomeFuncionario || "",
+    funcao: (u) => u.Funcao || "",
+    status: (u) => u.Situacao.trim(),
+  });
+
+  const colunasExportacao = colunasVisiveisParaExportacao<Usuario>(COLUNAS, colunasVisiveis, {
+    id: (u) => String(u.IDUser),
+    usuario: (u) => u.Loginn,
+    funcionario: (u) => u.NomeFuncionario || "-",
+    funcao: (u) => u.Funcao || "-",
+    status: (u) => (u.Situacao.trim() === "A" ? "ATIVO" : "INATIVO"),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(usuariosOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const usuariosPagina = usuarios.slice(
-    (paginaAtual - 1) * ITENS_POR_PAGINA,
-    paginaAtual * ITENS_POR_PAGINA
+  const usuariosPagina = usuariosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
   );
 
   return (
@@ -175,6 +218,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
           type="button"
           className="usuarios-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -194,6 +238,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
               type="button"
               className="usuarios-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -213,6 +258,15 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
 
         <div className="usuarios-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="usuarios"
+            titulo="Usuários"
+            dados={usuariosOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="usuarios-btn-criar" onClick={abrirCriacao}>
             Criar Usuário
@@ -220,21 +274,46 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
         )}
       </div>
 
-      <div className="usuarios-tabela-wrapper">
+      <div className={`usuarios-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="usuarios-tabela">
           <thead>
             <tr>
               <th className="usuarios-col-expandir"></th>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("usuario") && <th>Usuário</th>}
-              {colunasVisiveis.has("funcionario") && <th>Funcionário</th>}
-              {colunasVisiveis.has("funcao") && <th>Função</th>}
-              {colunasVisiveis.has("status") && <th className="usuarios-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("usuario") && (
+                <ThOrdenavel campo="usuario" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Usuário
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("funcionario") && (
+                <ThOrdenavel campo="funcionario" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Funcionário
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("funcao") && (
+                <ThOrdenavel campo="funcao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Função
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="usuarios-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="usuarios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && usuariosPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 2} className="usuarios-vazio">Carregando...</td>
               </tr>
@@ -261,6 +340,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                         type="button"
                         className={`usuarios-btn-expandir ${expandido ? "aberto" : ""}`}
                         title={expandido ? "Ocultar permissões" : "Ver permissões"}
+                        aria-label={expandido ? "Ocultar permissões" : "Ver permissões"}
                         onClick={() => alternarExpandir(u.IDUser)}
                       >
                         <ChevronDown size={16} />
@@ -282,6 +362,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                         <button
                           className="usuarios-icone-acao perfil"
                           title="Perfil de permissões"
+                          aria-label="Perfil de permissões"
                           onClick={() => abrirPerfil(u.IDUser)}
                         >
                           <ShieldCheck size={16} />
@@ -291,6 +372,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                         <button
                           className="usuarios-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(u.IDUser)}
                         >
                           <Pencil size={16} />
@@ -300,6 +382,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
                         <button
                           className="usuarios-icone-acao perigo"
                           title="Desativar"
+                          aria-label="Desativar"
                           onClick={() => handleExcluir(u)}
                         >
                           <Trash2 size={16} />
@@ -365,6 +448,7 @@ function UsuariosPage({ permissoes, administrador, voltarInicio }: UsuariosPageP
 
       <div className="usuarios-rodape">
         <span>{usuarios.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="usuarios-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

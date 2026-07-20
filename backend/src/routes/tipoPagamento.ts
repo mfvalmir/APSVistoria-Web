@@ -62,15 +62,16 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // idTipoPagamento não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricaoTipoPagamento", sql.VarChar, descricaoTipoPagamento)
       .query(
         `INSERT INTO TipoPagamento (idTipoPagamento, TipoPagamento)
+         OUTPUT INSERTED.idTipoPagamento
          VALUES ((SELECT ISNULL(MAX(idTipoPagamento), 0) + 1 FROM TipoPagamento), @descricaoTipoPagamento)`
       );
 
-    res.status(201).json({ mensagem: "Tipo de pagamento criado" });
+    res.status(201).json({ idTipoPagamento: result.recordset[0].idTipoPagamento, mensagem: "Tipo de pagamento criado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar tipo de pagamento" });
@@ -105,9 +106,9 @@ router.put("/:id", authMiddleware, async (req, res) => {
 });
 
 // DELETE /tipo-pagamento/:id - exclusão definitiva (tabela sem coluna de status).
-// O banco legado não tem FK real entre ContaPagar/ContaPagarParcela/ContaReceber/ContaReceberParcela/Vistoria
-// e TipoPagamento.idTipoPagamento, então o vínculo é checado aqui na aplicação antes de excluir
-// (ver [[project-exclusao-verifica-vinculo]]).
+// O banco legado não tem FK real entre ContaPagar/ContaPagarParcela/ContaReceber/ContaReceberParcela/
+// Vistoria/CaixaMovimento e TipoPagamento.idTipoPagamento, então o vínculo é checado aqui na
+// aplicação antes de excluir (ver [[project-exclusao-verifica-vinculo]]).
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const pool = await getPool();
@@ -118,6 +119,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       { tabela: "ContaReceber", coluna: "IdPrimeiroTipoPagamento" },
       { tabela: "ContaReceberParcela", coluna: "idTipoPagamento" },
       { tabela: "Vistoria", coluna: "idPrimeiroTipoPagamento" },
+      { tabela: "CaixaMovimento", coluna: "idFormaPagamento" },
     ];
 
     for (const { tabela, coluna } of tabelasVinculadas) {

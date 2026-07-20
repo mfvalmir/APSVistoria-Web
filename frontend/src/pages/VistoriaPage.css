@@ -203,8 +203,12 @@
 }
 
 .vistoria-linha-expandida td {
-  background: var(--cor-fundo-secundario);
+  background: #e4edf7;
   padding: 14px 16px !important;
+}
+
+:root[data-theme="dark"] .vistoria-linha-expandida td {
+  background: #23282f;
 }
 
 .vistoria-tabela tbody tr.vistoria-linha-pai-expandida td {

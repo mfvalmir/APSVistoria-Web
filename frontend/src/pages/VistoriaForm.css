@@ -3,6 +3,11 @@
   min-width: 180px;
 }
 
+.vistoria-sugestao-doc {
+  color: var(--cor-texto-fraco);
+  font-size: 12px;
+}
+
 .vistoria-form-dica-travado {
   margin: 0;
   padding: 10px 14px;
@@ -11,4 +16,45 @@
   border: 1px solid var(--cor-borda);
   color: var(--cor-texto-fraco);
   font-size: 13px;
+}
+
+.vistoria-form-avista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--cor-fundo-secundario);
+  border: 1px solid var(--cor-borda);
+}
+
+.vistoria-form-avista p {
+  margin: 0;
+  color: var(--cor-texto-fraco);
+  font-size: 13px;
+}
+
+.vistoria-form-btn-recibo-avista {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vistoria-form-btn-recibo-avista:hover:not(:disabled) {
+  background: var(--cor-fundo-hover);
+}
+
+.vistoria-form-btn-recibo-avista:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

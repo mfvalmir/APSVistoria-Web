@@ -19,8 +19,12 @@ export async function listarResponsaveis(clienteId: number): Promise<Responsavel
   return data;
 }
 
-export async function criarResponsavel(clienteId: number, dados: DadosResponsavel): Promise<void> {
-  await api.post(`/clientes/${clienteId}/responsaveis`, dados);
+export async function criarResponsavel(
+  clienteId: number,
+  dados: DadosResponsavel
+): Promise<{ idResponsavel: number }> {
+  const { data } = await api.post(`/clientes/${clienteId}/responsaveis`, dados);
+  return data;
 }
 
 export async function atualizarResponsavel(

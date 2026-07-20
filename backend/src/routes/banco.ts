@@ -62,15 +62,16 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // idBanco não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricaoBanco", sql.VarChar, descricaoBanco)
       .query(
         `INSERT INTO Banco (idBanco, DescricaoBanco)
+         OUTPUT INSERTED.idBanco
          VALUES ((SELECT ISNULL(MAX(idBanco), 0) + 1 FROM Banco), @descricaoBanco)`
       );
 
-    res.status(201).json({ mensagem: "Banco criado" });
+    res.status(201).json({ idBanco: result.recordset[0].idBanco, mensagem: "Banco criado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar banco" });

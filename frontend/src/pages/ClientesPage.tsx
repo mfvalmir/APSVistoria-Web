@@ -5,12 +5,18 @@ import { listarClientes, excluirCliente, Cliente } from "../api/clientes";
 import { ItemMenu } from "../api/menu";
 import ClienteForm from "./ClienteForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./ClientesPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -41,6 +47,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -53,6 +60,10 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("clientes", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("clientes"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -62,6 +73,12 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
       salvarColunasVisiveis("clientes", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("clientes", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -85,15 +102,16 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
   }, [busca, tipoPessoa, subView]);
 
   async function handleExcluir(cliente: Cliente) {
-    if (!window.confirm(`Excluir o cliente "${cliente.NomeCliente}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir o cliente "${cliente.NomeCliente}"?`, perigo: true }))) return;
     try {
       await excluirCliente(cliente.idCliente);
       carregar();
+      mostrarToast("Cliente excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o cliente");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o cliente", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -117,9 +135,27 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
     return <ClienteForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(clientes.length / ITENS_POR_PAGINA));
+  const clientesOrdenados = ordenarLista(clientes, ordenacao, {
+    id: (c) => c.idCliente,
+    nome: (c) => c.NomeCliente,
+    tipo: (c) => c.TipoPessoa,
+    documento: (c) => c.CpfCnpj,
+    categoria: (c) => c.TipoCliente || "",
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Cliente>(COLUNAS, colunasVisiveis, {
+    id: (c) => String(c.idCliente),
+    nome: (c) => c.NomeCliente,
+    tipo: (c) => (c.TipoPessoa === "J" ? "Jurídica" : "Física"),
+    documento: (c) => formatarCpfCnpjExibicao(c.CpfCnpj, c.TipoPessoa),
+    categoria: (c) => c.TipoCliente || "-",
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(clientesOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const clientesPagina = clientes.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const clientesPagina = clientesOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="clientes-page">
@@ -128,6 +164,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
           type="button"
           className="clientes-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -147,6 +184,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
               type="button"
               className="clientes-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -166,6 +204,15 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
 
         <div className="clientes-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="clientes"
+            titulo="Clientes"
+            dados={clientesOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="clientes-btn-criar" onClick={abrirCriacao}>
             Criar Cliente
@@ -173,20 +220,45 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
         )}
       </div>
 
-      <div className="clientes-tabela-wrapper">
+      <div className={`clientes-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="clientes-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("nome") && <th>Nome</th>}
-              {colunasVisiveis.has("tipo") && <th className="clientes-col-tipo">Tipo</th>}
-              {colunasVisiveis.has("documento") && <th>CPF/CNPJ</th>}
-              {colunasVisiveis.has("categoria") && <th>Categoria</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("nome") && (
+                <ThOrdenavel campo="nome" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Nome
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("tipo") && (
+                <ThOrdenavel
+                  campo="tipo"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="clientes-col-tipo"
+                >
+                  Tipo
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("documento") && (
+                <ThOrdenavel campo="documento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  CPF/CNPJ
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("categoria") && (
+                <ThOrdenavel campo="categoria" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Categoria
+                </ThOrdenavel>
+              )}
               <th className="clientes-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && clientesPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="clientes-vazio">Carregando...</td>
               </tr>
@@ -209,6 +281,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
                       <button
                         className="clientes-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(c.idCliente)}
                       >
                         <Pencil size={16} />
@@ -218,6 +291,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
                       <button
                         className="clientes-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(c)}
                       >
                         <Trash2 size={16} />
@@ -233,6 +307,7 @@ function ClientesPage({ permissoes, voltarInicio }: ClientesPageProps) {
 
       <div className="clientes-rodape">
         <span>{clientes.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="clientes-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

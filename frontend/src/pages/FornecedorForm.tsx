@@ -4,6 +4,7 @@ import { ArrowLeft, Send } from "lucide-react";
 import { obterFornecedor, criarFornecedor, atualizarFornecedor } from "../api/fornecedores";
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { validarCPF, validarCNPJ } from "../utils/documento";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 import "./FornecedorForm.css";
 
@@ -57,6 +58,8 @@ function FornecedorForm({ id, onVoltar }: FornecedorFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -77,14 +80,11 @@ function FornecedorForm({ id, onVoltar }: FornecedorFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!razaoSocial) {
-      setErro("Informe a razão social");
-      return;
-    }
-    if (cpfCnpj && !documentoValido(cpfCnpj)) {
-      setErro("CPF/CNPJ inválido");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!razaoSocial.trim()) novosErros.razaoSocial = "Informe a razão social";
+    if (cpfCnpj && !documentoValido(cpfCnpj)) novosErros.cpfCnpj = "CPF/CNPJ inválido";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = {
       razaoSocial,
@@ -99,8 +99,10 @@ function FornecedorForm({ id, onVoltar }: FornecedorFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarFornecedor(id, { ...dados, ativo });
+        mostrarToast("Fornecedor atualizado com sucesso", "sucesso");
       } else {
         await criarFornecedor(dados);
+        mostrarToast("Fornecedor criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -127,20 +129,24 @@ function FornecedorForm({ id, onVoltar }: FornecedorFormProps) {
         <h2>{modoEdicao ? "Editar Fornecedor" : "Novo Fornecedor"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.razaoSocial ? "campo-invalido" : ""}`}>
             <label htmlFor="ff-razao-social">
               Razão Social <span className="obrigatorio">*</span>
             </label>
             <input
               id="ff-razao-social"
               value={razaoSocial}
-              onChange={(e) => setRazaoSocial(e.target.value)}
+              onChange={(e) => {
+                setRazaoSocial(e.target.value);
+                if (erros.razaoSocial) setErros((atual) => ({ ...atual, razaoSocial: "" }));
+              }}
               placeholder="Digite a razão social"
               maxLength={150}
               required
             />
+            {erros.razaoSocial && <span className="usuario-form-campo-erro">{erros.razaoSocial}</span>}
           </div>
 
           <div className="usuario-form-campo">
@@ -154,16 +160,20 @@ function FornecedorForm({ id, onVoltar }: FornecedorFormProps) {
             />
           </div>
 
-          <div className="usuario-form-campo fornecedor-form-campo-documento">
+          <div className={`usuario-form-campo fornecedor-form-campo-documento ${erros.cpfCnpj ? "campo-invalido" : ""}`}>
             <label htmlFor="ff-documento">CPF/CNPJ</label>
             <input
               id="ff-documento"
               value={cpfCnpj}
-              onChange={(e) => setCpfCnpj(formatarDocumento(e.target.value))}
+              onChange={(e) => {
+                setCpfCnpj(formatarDocumento(e.target.value));
+                if (erros.cpfCnpj) setErros((atual) => ({ ...atual, cpfCnpj: "" }));
+              }}
               placeholder="000.000.000-00"
               inputMode="numeric"
               maxLength={18}
             />
+            {erros.cpfCnpj && <span className="usuario-form-campo-erro">{erros.cpfCnpj}</span>}
           </div>
 
           {modoEdicao && (

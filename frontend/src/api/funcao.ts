@@ -19,8 +19,9 @@ export async function obterFuncao(id: number): Promise<Funcao> {
   return data;
 }
 
-export async function criarFuncao(dados: DadosFuncao): Promise<void> {
-  await api.post("/funcao", dados);
+export async function criarFuncao(dados: DadosFuncao): Promise<{ idFuncao: number }> {
+  const { data } = await api.post("/funcao", dados);
+  return data;
 }
 
 export async function atualizarFuncao(id: number, dados: DadosFuncao): Promise<void> {

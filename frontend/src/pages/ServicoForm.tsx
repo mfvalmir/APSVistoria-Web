@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Send } from "lucide-react";
 import { obterServico, criarServico, atualizarServico } from "../api/servico";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 import "./ServicoForm.css";
 
@@ -39,6 +40,8 @@ function ServicoForm({ id, onVoltar }: ServicoFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -55,15 +58,12 @@ function ServicoForm({ id, onVoltar }: ServicoFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricaoServico) {
-      setErro("Informe a descrição");
-      return;
-    }
     const valorNumero = moedaParaNumero(valorServico);
-    if (valorNumero === null) {
-      setErro("Informe o valor do serviço");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricaoServico.trim()) novosErros.descricaoServico = "Informe a descrição";
+    if (valorNumero === null) novosErros.valorServico = "Informe o valor do serviço";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0 || valorNumero === null) return;
 
     const dados = { descricaoServico, valorServico: valorNumero };
 
@@ -71,8 +71,10 @@ function ServicoForm({ id, onVoltar }: ServicoFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarServico(id, { ...dados, situacao });
+        mostrarToast("Serviço atualizado com sucesso", "sucesso");
       } else {
         await criarServico(dados);
+        mostrarToast("Serviço criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -99,34 +101,42 @@ function ServicoForm({ id, onVoltar }: ServicoFormProps) {
         <h2>{modoEdicao ? "Editar Serviço" : "Novo Serviço"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricaoServico ? "campo-invalido" : ""}`}>
             <label htmlFor="sf-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="sf-descricao"
               value={descricaoServico}
-              onChange={(e) => setDescricaoServico(e.target.value)}
+              onChange={(e) => {
+                setDescricaoServico(e.target.value);
+                if (erros.descricaoServico) setErros((atual) => ({ ...atual, descricaoServico: "" }));
+              }}
               placeholder="Digite a descrição do serviço"
               maxLength={100}
               required
             />
+            {erros.descricaoServico && <span className="usuario-form-campo-erro">{erros.descricaoServico}</span>}
           </div>
 
-          <div className="usuario-form-campo servico-form-campo-valor">
+          <div className={`usuario-form-campo servico-form-campo-valor ${erros.valorServico ? "campo-invalido" : ""}`}>
             <label htmlFor="sf-valor">
               Valor <span className="obrigatorio">*</span>
             </label>
             <input
               id="sf-valor"
               value={valorServico}
-              onChange={(e) => setValorServico(formatarMoeda(e.target.value))}
+              onChange={(e) => {
+                setValorServico(formatarMoeda(e.target.value));
+                if (erros.valorServico) setErros((atual) => ({ ...atual, valorServico: "" }));
+              }}
               placeholder="R$ 0,00"
               inputMode="numeric"
               required
             />
+            {erros.valorServico && <span className="usuario-form-campo-erro">{erros.valorServico}</span>}
           </div>
 
           {modoEdicao && (

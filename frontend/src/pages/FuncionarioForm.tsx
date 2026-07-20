@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ExternalLink, Send } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Send } from "lucide-react";
 import {
   obterFuncionario,
   criarFuncionario,
@@ -12,8 +12,15 @@ import {
   BancoOpcao,
   BairroOpcao,
 } from "../api/funcionarios";
+import { Funcao } from "../api/funcao";
+import { Bairro } from "../api/bairros";
+import { Banco } from "../api/banco";
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { validarCPF } from "../utils/documento";
+import { useToast } from "../contexts/ToastContext";
+import FuncaoModal from "./FuncaoModal";
+import BairroModal from "./BairroModal";
+import BancoModal from "./BancoModal";
 import "./UsuarioForm.css";
 import "./FuncionarioForm.css";
 
@@ -87,10 +94,15 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
   const [bancos, setBancos] = useState<BancoOpcao[]>([]);
   const [sugestoesBairro, setSugestoesBairro] = useState<BairroOpcao[]>([]);
   const [mostrarSugestoesBairro, setMostrarSugestoesBairro] = useState(false);
+  const [mostrarModalFuncao, setMostrarModalFuncao] = useState(false);
+  const [mostrarModalBairro, setMostrarModalBairro] = useState(false);
+  const [mostrarModalBanco, setMostrarModalBanco] = useState(false);
 
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     buscarFuncoes().then(setFuncoes);
@@ -135,6 +147,14 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
     return () => clearTimeout(timeout);
   }, [nomeBairro]);
 
+  function handleFuncaoCriada(funcao: Funcao) {
+    setFuncoes((atual) =>
+      [...atual, funcao].sort((a, b) => a.descricao.localeCompare(b.descricao))
+    );
+    setIdFuncao(funcao.idFuncao);
+    setMostrarModalFuncao(false);
+  }
+
   function selecionarBairro(b: BairroOpcao) {
     setIdBairro(b.IDBairro);
     setNomeBairro(b.DescricaoCidade ? `${b.DescricaoBairro} - ${b.DescricaoCidade}/${b.UF}` : b.DescricaoBairro);
@@ -142,18 +162,28 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
     setMostrarSugestoesBairro(false);
   }
 
+  function handleBairroCriado(bairro: Bairro) {
+    selecionarBairro(bairro);
+    setMostrarModalBairro(false);
+  }
+
+  function handleBancoCriado(banco: Banco) {
+    setBancos((atual) =>
+      [...atual, banco].sort((a, b) => a.DescricaoBanco.localeCompare(b.DescricaoBanco))
+    );
+    setIdBanco(banco.idBanco);
+    setMostrarModalBanco(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
 
-    if (!nomeFuncionario) {
-      setErro("Informe o nome do funcionário");
-      return;
-    }
-    if (cpf && !validarCPF(cpf)) {
-      setErro("CPF inválido");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!nomeFuncionario.trim()) novosErros.nomeFuncionario = "Informe o nome do funcionário";
+    if (cpf && !validarCPF(cpf)) novosErros.cpf = "CPF inválido";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = {
       nomeFuncionario,
@@ -179,8 +209,10 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarFuncionario(id, { ...dados, situacao });
+        mostrarToast("Funcionário atualizado com sucesso", "sucesso");
       } else {
         await criarFuncionario(dados);
+        mostrarToast("Funcionário criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -207,19 +239,23 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
         <h2>{modoEdicao ? "Editar Funcionário" : "Novo Funcionário"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.nomeFuncionario ? "campo-invalido" : ""}`}>
             <label htmlFor="ff-nome">
               Nome <span className="obrigatorio">*</span>
             </label>
             <input
               id="ff-nome"
               value={nomeFuncionario}
-              onChange={(e) => setNomeFuncionario(e.target.value)}
+              onChange={(e) => {
+                setNomeFuncionario(e.target.value);
+                if (erros.nomeFuncionario) setErros((atual) => ({ ...atual, nomeFuncionario: "" }));
+              }}
               placeholder="Digite o nome do funcionário"
               required
             />
+            {erros.nomeFuncionario && <span className="usuario-form-campo-erro">{erros.nomeFuncionario}</span>}
           </div>
 
           <div className="usuario-form-campo usuario-form-campo-status">
@@ -246,16 +282,20 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo usuario-form-campo-status">
+          <div className={`usuario-form-campo usuario-form-campo-status ${erros.cpf ? "campo-invalido" : ""}`}>
             <label htmlFor="ff-cpf">CPF</label>
             <input
               id="ff-cpf"
               value={cpf}
-              onChange={(e) => setCpf(formatarCPF(e.target.value))}
+              onChange={(e) => {
+                setCpf(formatarCPF(e.target.value));
+                if (erros.cpf) setErros((atual) => ({ ...atual, cpf: "" }));
+              }}
               placeholder="000.000.000-00"
               inputMode="numeric"
               maxLength={14}
             />
+            {erros.cpf && <span className="usuario-form-campo-erro">{erros.cpf}</span>}
           </div>
 
           <div className="usuario-form-campo usuario-form-campo-status">
@@ -297,10 +337,11 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Funções"
-                onClick={() => navegarPara?.("funcao", "Cadastro de Funções", "Cadastros")}
+                title="Cadastrar nova função"
+                aria-label="Cadastrar nova função"
+                onClick={() => setMostrarModalFuncao(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
           </div>
@@ -357,10 +398,11 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Bairros"
-                onClick={() => navegarPara?.("bairros", "Cadastro de Bairros", "Cadastros")}
+                title="Cadastrar novo bairro"
+                aria-label="Cadastrar novo bairro"
+                onClick={() => setMostrarModalBairro(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
             {mostrarSugestoesBairro && sugestoesBairro.length > 0 && (
@@ -407,10 +449,11 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Bancos"
-                onClick={() => navegarPara?.("banco", "Cadastro de Bancos", "Cadastros")}
+                title="Cadastrar novo banco"
+                aria-label="Cadastrar novo banco"
+                onClick={() => setMostrarModalBanco(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
           </div>
@@ -454,6 +497,18 @@ function FuncionarioForm({ id, onVoltar, navegarPara }: FuncionarioFormProps) {
           <Send size={16} />
         </button>
       </form>
+
+      {mostrarModalFuncao && (
+        <FuncaoModal onCancelar={() => setMostrarModalFuncao(false)} onCriada={handleFuncaoCriada} />
+      )}
+
+      {mostrarModalBairro && (
+        <BairroModal onCancelar={() => setMostrarModalBairro(false)} onCriada={handleBairroCriado} />
+      )}
+
+      {mostrarModalBanco && (
+        <BancoModal onCancelar={() => setMostrarModalBanco(false)} onCriado={handleBancoCriado} />
+      )}
     </div>
   );
 }

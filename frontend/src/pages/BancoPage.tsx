@@ -5,12 +5,18 @@ import { listarBancos, excluirBanco, Banco } from "../api/banco";
 import { ItemMenu } from "../api/menu";
 import BancoForm from "./BancoForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./BancoPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -28,6 +34,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -39,6 +46,10 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("banco", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("banco"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -48,6 +59,12 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
       salvarColunasVisiveis("banco", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("banco", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -71,15 +88,16 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
   }, [busca, subView]);
 
   async function handleExcluir(banco: Banco) {
-    if (!window.confirm(`Excluir o banco "${banco.DescricaoBanco}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir o banco "${banco.DescricaoBanco}"?`, perigo: true }))) return;
     try {
       await excluirBanco(banco.idBanco);
       carregar();
+      mostrarToast("Banco excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o banco");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o banco", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -103,9 +121,21 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
     return <BancoForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(bancos.length / ITENS_POR_PAGINA));
+  const bancosOrdenados = ordenarLista(bancos, ordenacao, {
+    id: (b) => b.idBanco,
+    descricao: (b) => b.DescricaoBanco,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Banco>(COLUNAS, colunasVisiveis, {
+    id: (b) => String(b.idBanco),
+    descricao: (b) => b.DescricaoBanco,
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(bancosOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const bancosPagina = bancos.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const bancosPagina = bancosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="banco-page">
@@ -114,6 +144,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
           type="button"
           className="banco-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -129,6 +160,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
               type="button"
               className="banco-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -138,6 +170,15 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
 
         <div className="banco-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="bancos"
+            titulo="Bancos"
+            dados={bancosOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="banco-btn-criar" onClick={abrirCriacao}>
             Criar Banco
@@ -145,17 +186,25 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
         )}
       </div>
 
-      <div className="banco-tabela-wrapper">
+      <div className={`banco-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="banco-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
               <th className="banco-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && bancosPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="banco-vazio">Carregando...</td>
               </tr>
@@ -173,6 +222,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
                       <button
                         className="banco-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(b.idBanco)}
                       >
                         <Pencil size={16} />
@@ -182,6 +232,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
                       <button
                         className="banco-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(b)}
                       >
                         <Trash2 size={16} />
@@ -197,6 +248,7 @@ function BancoPage({ permissoes, voltarInicio }: BancoPageProps) {
 
       <div className="banco-rodape">
         <span>{bancos.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="banco-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

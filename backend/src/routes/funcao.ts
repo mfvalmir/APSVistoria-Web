@@ -62,15 +62,16 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // idFuncao não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricao", sql.VarChar, descricao)
       .query(
         `INSERT INTO Funcao (idFuncao, descricao)
+         OUTPUT INSERTED.idFuncao
          VALUES ((SELECT ISNULL(MAX(idFuncao), 0) + 1 FROM Funcao), @descricao)`
       );
 
-    res.status(201).json({ mensagem: "Função criada" });
+    res.status(201).json({ idFuncao: result.recordset[0].idFuncao, mensagem: "Função criada" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar função" });

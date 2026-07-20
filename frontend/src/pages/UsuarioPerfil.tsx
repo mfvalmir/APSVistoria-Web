@@ -247,42 +247,49 @@ function UsuarioPerfil({ usuarioId, onVoltar }: UsuarioPerfilProps) {
                     <input
                       type="checkbox"
                       title="Acessar Formulário"
+                      aria-label="Acessar Formulário"
                       checked={item.acessoFormulario}
                       onChange={() => handleToggleFlag(item.formularioId, "acessoFormulario", item.acessoFormulario)}
                     />
                     <input
                       type="checkbox"
                       title="Adicionar Registro"
+                      aria-label="Adicionar Registro"
                       checked={item.podeAdicionar}
                       onChange={() => handleToggleFlag(item.formularioId, "podeAdicionar", item.podeAdicionar)}
                     />
                     <input
                       type="checkbox"
                       title="Editar Registro"
+                      aria-label="Editar Registro"
                       checked={item.podeEditar}
                       onChange={() => handleToggleFlag(item.formularioId, "podeEditar", item.podeEditar)}
                     />
                     <input
                       type="checkbox"
                       title="Excluir Registro"
+                      aria-label="Excluir Registro"
                       checked={item.podeExcluir}
                       onChange={() => handleToggleFlag(item.formularioId, "podeExcluir", item.podeExcluir)}
                     />
                     <input
                       type="checkbox"
                       title="Imprimir Relatório"
+                      aria-label="Imprimir Relatório"
                       checked={item.podeImprimir}
                       onChange={() => handleToggleFlag(item.formularioId, "podeImprimir", item.podeImprimir)}
                     />
                     <input
                       type="checkbox"
                       title="Baixar Parcela Conta Pagar"
+                      aria-label="Baixar Parcela Conta Pagar"
                       checked={item.podeBaixarParCP}
                       onChange={() => handleToggleFlag(item.formularioId, "podeBaixarParCP", item.podeBaixarParCP)}
                     />
                     <input
                       type="checkbox"
                       title="Estornar Parcela Conta Pagar"
+                      aria-label="Estornar Parcela Conta Pagar"
                       checked={item.podeEstornarParCP}
                       onChange={() =>
                         handleToggleFlag(item.formularioId, "podeEstornarParCP", item.podeEstornarParCP)
@@ -291,12 +298,14 @@ function UsuarioPerfil({ usuarioId, onVoltar }: UsuarioPerfilProps) {
                     <input
                       type="checkbox"
                       title="Baixar Parcela Conta Receber"
+                      aria-label="Baixar Parcela Conta Receber"
                       checked={item.podeBaixarParCR}
                       onChange={() => handleToggleFlag(item.formularioId, "podeBaixarParCR", item.podeBaixarParCR)}
                     />
                     <input
                       type="checkbox"
                       title="Estornar Parcela Conta Receber"
+                      aria-label="Estornar Parcela Conta Receber"
                       checked={item.podeEstornarParCR}
                       onChange={() =>
                         handleToggleFlag(item.formularioId, "podeEstornarParCR", item.podeEstornarParCR)

@@ -83,6 +83,16 @@
   opacity: 0.6;
 }
 
+.usuario-form-campo.campo-invalido input,
+.usuario-form-campo.campo-invalido select {
+  border-color: var(--cor-erro);
+}
+
+.usuario-form-campo-erro {
+  color: var(--cor-erro);
+  font-size: 12px;
+}
+
 .usuario-form-campo-com-acao {
   display: flex;
   gap: 8px;

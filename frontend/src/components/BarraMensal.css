@@ -1,6 +1,7 @@
 .barra-mensal {
   --seq-1: #2a78d6;
   --seq-2: #1baf7a;
+  --seq-3: #c9862a;
   --ink-secondary: #52514e;
   --ink-muted: #898781;
   --gridline: #e1e0d9;
@@ -15,6 +16,7 @@
 :root[data-theme="dark"] .barra-mensal {
   --seq-1: #3987e5;
   --seq-2: #199e70;
+  --seq-3: #d99a3f;
   --ink-secondary: #c3c2b7;
   --ink-muted: #898781;
   --gridline: #2c2c2a;
@@ -67,6 +69,10 @@
 
 .barra-mensal-barra-sequencial-2 {
   background: var(--seq-2);
+}
+
+.barra-mensal-barra-sequencial-3 {
+  background: var(--seq-3);
 }
 
 .barra-mensal-coluna:hover .barra-mensal-barra {

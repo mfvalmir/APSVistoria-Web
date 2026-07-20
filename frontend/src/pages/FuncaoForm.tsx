@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Send } from "lucide-react";
 import { obterFuncao, criarFuncao, atualizarFuncao } from "../api/funcao";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 
 interface FuncaoFormProps {
@@ -18,6 +19,8 @@ function FuncaoForm({ id, onVoltar }: FuncaoFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -30,10 +33,10 @@ function FuncaoForm({ id, onVoltar }: FuncaoFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricao) {
-      setErro("Informe a descrição");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricao.trim()) novosErros.descricao = "Informe a descrição";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = { descricao };
 
@@ -41,8 +44,10 @@ function FuncaoForm({ id, onVoltar }: FuncaoFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarFuncao(id, dados);
+        mostrarToast("Função atualizada com sucesso", "sucesso");
       } else {
         await criarFuncao(dados);
+        mostrarToast("Função criada com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -69,20 +74,24 @@ function FuncaoForm({ id, onVoltar }: FuncaoFormProps) {
         <h2>{modoEdicao ? "Editar Função" : "Nova Função"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricao ? "campo-invalido" : ""}`}>
             <label htmlFor="ff-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="ff-descricao"
               value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
+              onChange={(e) => {
+                setDescricao(e.target.value);
+                if (erros.descricao) setErros((atual) => ({ ...atual, descricao: "" }));
+              }}
               placeholder="Digite a descrição da função"
               maxLength={50}
               required
             />
+            {erros.descricao && <span className="usuario-form-campo-erro">{erros.descricao}</span>}
           </div>
         </div>
 

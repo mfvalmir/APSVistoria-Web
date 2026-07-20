@@ -38,3 +38,31 @@ body {
   background-color: var(--cor-fundo);
   color: var(--cor-texto);
 }
+
+/* Listagens: enquanto uma busca/filtro recarrega os dados, mantém as linhas antigas visíveis
+   (esmaecidas) em vez de trocar a tabela inteira por "Carregando...", evitando o "piscar" e a
+   perda de contexto visual (posição de scroll, o que já estava sendo lido). */
+.tabela-atualizando {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* Botão de exportar CSV nas listagens - compartilhado por todas as páginas em vez de repetir a
+   mesma regra em cada arquivo CSS de página (mesmo visual do botão "voltar" de cada toolbar). */
+.btn-exportar-csv {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-exportar-csv:hover {
+  background: var(--cor-fundo-hover);
+}

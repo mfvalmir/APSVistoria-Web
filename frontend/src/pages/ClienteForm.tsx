@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { ArrowLeft, Send, Plus, Pencil, Trash2 } from "lucide-react";
-import { obterCliente, criarCliente, atualizarCliente } from "../api/clientes";
+import { listarClientes, obterCliente, criarCliente, atualizarCliente, Cliente } from "../api/clientes";
 import {
   listarResponsaveis,
   criarResponsavel,
@@ -11,12 +11,19 @@ import {
 } from "../api/responsaveis";
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { validarCPF, validarCNPJ } from "../utils/documento";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./UsuarioForm.css";
 import "./ClienteForm.css";
 
 interface ClienteFormProps {
   id: number | null;
   onVoltar: () => void;
+  // Usados quando o form é reaproveitado dentro do ClienteModal (cadastro rápido a partir de
+  // outra tela): esconde o cabeçalho de página e avisa o id assim que o cliente é criado, pra
+  // permitir cadastrar múltiplos responsáveis antes de fechar o modal.
+  mostrarCabecalho?: boolean;
+  aoCriarCliente?: (cliente: Cliente) => void;
 }
 
 function formatarCPF(valor: string): string {
@@ -40,7 +47,7 @@ function formatarCpfCnpj(valor: string, tipoPessoa: "F" | "J"): string {
   return tipoPessoa === "J" ? formatarCNPJ(valor) : formatarCPF(valor);
 }
 
-function ClienteForm({ id, onVoltar }: ClienteFormProps) {
+function ClienteForm({ id, onVoltar, mostrarCabecalho = true, aoCriarCliente }: ClienteFormProps) {
   // Estado próprio (não só a prop `id`): ao criar um cliente novo e o usuário optar por
   // adicionar um responsável na hora, o form muda pra modo edição sem trocar de tela.
   const [idAtual, setIdAtual] = useState(id);
@@ -55,6 +62,7 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
 
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([]);
   const [carregandoResponsaveis, setCarregandoResponsaveis] = useState(false);
@@ -64,7 +72,13 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
   const [docResponsavel, setDocResponsavel] = useState("");
   const [celularResponsavel, setCelularResponsavel] = useState("");
   const [erroResponsavel, setErroResponsavel] = useState("");
+  const [errosResponsavel, setErrosResponsavel] = useState<Record<string, string>>({});
   const [salvandoResponsavel, setSalvandoResponsavel] = useState(false);
+  const [sugestoesClienteResponsavel, setSugestoesClienteResponsavel] = useState<Cliente[]>([]);
+  const [mostrarSugestoesClienteResponsavel, setMostrarSugestoesClienteResponsavel] = useState(false);
+
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   useEffect(() => {
     if (!modoEdicao || idAtual === null) return;
@@ -95,12 +109,38 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idAtual, modoEdicao]);
 
+  // Ao digitar o nome de um responsável novo, busca por aproximação na tabela Cliente - um
+  // cliente pessoa física já cadastrado pode ser o responsável de um cliente pessoa jurídica.
+  // Só reaproveita nome/CPF (não o idCliente): o responsável é sempre um registro novo, próprio
+  // do cliente atual.
+  useEffect(() => {
+    if (!formResponsavelAberto || responsavelEditandoId !== null || nomeResponsavel.trim().length < 2) {
+      setSugestoesClienteResponsavel([]);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      listarClientes(nomeResponsavel, "F").then(setSugestoesClienteResponsavel);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [nomeResponsavel, formResponsavelAberto, responsavelEditandoId]);
+
+  function selecionarClienteComoResponsavel(c: Cliente) {
+    setNomeResponsavel(c.NomeCliente);
+    setDocResponsavel(c.CpfCnpj ? formatarCPF(c.CpfCnpj) : "");
+    setSugestoesClienteResponsavel([]);
+    setMostrarSugestoesClienteResponsavel(false);
+  }
+
   function abrirNovoResponsavel() {
     setResponsavelEditandoId(null);
     setNomeResponsavel("");
     setDocResponsavel("");
     setCelularResponsavel("");
     setErroResponsavel("");
+    setErrosResponsavel({});
+    setSugestoesClienteResponsavel([]);
     setFormResponsavelAberto(true);
   }
 
@@ -110,6 +150,8 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
     setDocResponsavel(r.DocResponsavel ? formatarCPF(r.DocResponsavel) : "");
     setCelularResponsavel(r.CelularResponsavel || "");
     setErroResponsavel("");
+    setErrosResponsavel({});
+    setSugestoesClienteResponsavel([]);
     setFormResponsavelAberto(true);
   }
 
@@ -117,14 +159,11 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
     e.preventDefault();
     setErroResponsavel("");
 
-    if (!nomeResponsavel) {
-      setErroResponsavel("Informe o nome do responsável");
-      return;
-    }
-    if (docResponsavel && !validarCPF(docResponsavel)) {
-      setErroResponsavel("CPF inválido");
-      return;
-    }
+    const novosErrosResponsavel: Record<string, string> = {};
+    if (!nomeResponsavel.trim()) novosErrosResponsavel.nomeResponsavel = "Informe o nome do responsável";
+    if (docResponsavel && !validarCPF(docResponsavel)) novosErrosResponsavel.docResponsavel = "CPF inválido";
+    setErrosResponsavel(novosErrosResponsavel);
+    if (Object.keys(novosErrosResponsavel).length > 0) return;
     if (idAtual === null) return;
 
     const dados = {
@@ -155,15 +194,16 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
 
   async function handleExcluirResponsavel(r: Responsavel) {
     if (idAtual === null) return;
-    if (!window.confirm(`Excluir o responsável "${r.NomeResponsavel}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir o responsável "${r.NomeResponsavel}"?`, perigo: true }))) return;
     try {
       await excluirResponsavel(idAtual, r.idResponsavel);
       carregarResponsaveis();
+      mostrarToast("Responsável excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o responsável");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o responsável", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -177,18 +217,17 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!nomeCliente || !cpfCnpj) {
-      setErro("Informe o nome e o CPF/CNPJ");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!nomeCliente.trim()) novosErros.nomeCliente = "Informe o nome";
+    if (!cpfCnpj.trim()) {
+      novosErros.cpfCnpj = tipoPessoa === "J" ? "Informe o CNPJ" : "Informe o CPF";
+    } else if (tipoPessoa === "F" && !validarCPF(cpfCnpj)) {
+      novosErros.cpfCnpj = "CPF inválido";
+    } else if (tipoPessoa === "J" && !validarCNPJ(cpfCnpj)) {
+      novosErros.cpfCnpj = "CNPJ inválido";
     }
-    if (tipoPessoa === "F" && !validarCPF(cpfCnpj)) {
-      setErro("CPF inválido");
-      return;
-    }
-    if (tipoPessoa === "J" && !validarCNPJ(cpfCnpj)) {
-      setErro("CNPJ inválido");
-      return;
-    }
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = {
       nomeCliente,
@@ -202,12 +241,24 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
     try {
       if (modoEdicao && idAtual !== null) {
         await atualizarCliente(idAtual, dados);
+        mostrarToast("Cliente atualizado com sucesso", "sucesso");
         onVoltar();
       } else {
         const novoId = await criarCliente(dados);
-        const querAdicionarResponsavel = window.confirm(
-          "Cliente criado com sucesso! Deseja adicionar um responsável a este cliente agora?"
-        );
+        aoCriarCliente?.({
+          idCliente: novoId,
+          NomeCliente: nomeCliente,
+          TipoPessoa: tipoPessoa,
+          CpfCnpj: dados.cpfCnpj,
+          TipoCliente: tipoCliente,
+          Observacao: observacao || null,
+        });
+        const querAdicionarResponsavel = await confirmar({
+          titulo: "Cliente criado",
+          mensagem: "Cliente criado com sucesso! Deseja adicionar um responsável a este cliente agora?",
+          textoConfirmar: "Adicionar responsável",
+          textoCancelar: "Agora não",
+        });
         if (querAdicionarResponsavel) {
           setIdAtual(novoId);
           abrirNovoResponsavel();
@@ -232,27 +283,39 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
 
   return (
     <div className="usuario-form-pagina">
-      <div className="usuario-form-cabecalho">
-        <button className="usuario-form-voltar" onClick={onVoltar} type="button">
-          <ArrowLeft size={18} />
-        </button>
-        <h2>{modoEdicao ? "Editar Cliente" : "Novo Cliente"}</h2>
-      </div>
+      {mostrarCabecalho && (
+        <div className="usuario-form-cabecalho">
+          <button className="usuario-form-voltar" onClick={onVoltar} type="button">
+            <ArrowLeft size={18} />
+          </button>
+          <h2>{modoEdicao ? "Editar Cliente" : "Novo Cliente"}</h2>
+        </div>
+      )}
 
-      <form id="cliente-form" onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form
+        id="cliente-form"
+        onSubmit={handleSubmit}
+        onKeyDown={focarProximoCampoAoEnter}
+        className="usuario-form"
+        noValidate
+      >
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.nomeCliente ? "campo-invalido" : ""}`}>
             <label htmlFor="cf-nome">
               Nome <span className="obrigatorio">*</span>
             </label>
             <input
               id="cf-nome"
               value={nomeCliente}
-              onChange={(e) => setNomeCliente(e.target.value)}
+              onChange={(e) => {
+                setNomeCliente(e.target.value);
+                if (erros.nomeCliente) setErros((atual) => ({ ...atual, nomeCliente: "" }));
+              }}
               placeholder="Digite o nome do cliente"
               maxLength={50}
               required
             />
+            {erros.nomeCliente && <span className="usuario-form-campo-erro">{erros.nomeCliente}</span>}
           </div>
 
           <div className="usuario-form-campo usuario-form-campo-status">
@@ -269,19 +332,23 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
             </select>
           </div>
 
-          <div className="usuario-form-campo cliente-form-campo-documento">
+          <div className={`usuario-form-campo cliente-form-campo-documento ${erros.cpfCnpj ? "campo-invalido" : ""}`}>
             <label htmlFor="cf-documento">
               {tipoPessoa === "J" ? "CNPJ" : "CPF"} <span className="obrigatorio">*</span>
             </label>
             <input
               id="cf-documento"
               value={cpfCnpj}
-              onChange={(e) => setCpfCnpj(formatarCpfCnpj(e.target.value, tipoPessoa))}
+              onChange={(e) => {
+                setCpfCnpj(formatarCpfCnpj(e.target.value, tipoPessoa));
+                if (erros.cpfCnpj) setErros((atual) => ({ ...atual, cpfCnpj: "" }));
+              }}
               placeholder={tipoPessoa === "J" ? "00.000.000/0000-00" : "000.000.000-00"}
               inputMode="numeric"
               maxLength={18}
               required
             />
+            {erros.cpfCnpj && <span className="usuario-form-campo-erro">{erros.cpfCnpj}</span>}
           </div>
 
           <div className="usuario-form-campo usuario-form-campo-status">
@@ -331,32 +398,69 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
           </div>
 
           {formResponsavelAberto && (
-            <form onSubmit={salvarResponsavel} className="cliente-responsaveis-form">
+            <form onSubmit={salvarResponsavel} className="cliente-responsaveis-form" noValidate>
               <div className="usuario-form-linha">
-                <div className="usuario-form-campo">
+                <div
+                  className={`usuario-form-campo usuario-form-combobox ${
+                    errosResponsavel.nomeResponsavel ? "campo-invalido" : ""
+                  }`}
+                >
                   <label htmlFor="rf-nome">
                     Nome <span className="obrigatorio">*</span>
                   </label>
                   <input
                     id="rf-nome"
                     value={nomeResponsavel}
-                    onChange={(e) => setNomeResponsavel(e.target.value)}
+                    onChange={(e) => {
+                      setNomeResponsavel(e.target.value);
+                      if (errosResponsavel.nomeResponsavel)
+                        setErrosResponsavel((atual) => ({ ...atual, nomeResponsavel: "" }));
+                    }}
+                    onFocus={() => setMostrarSugestoesClienteResponsavel(true)}
+                    onBlur={() => setTimeout(() => setMostrarSugestoesClienteResponsavel(false), 150)}
                     placeholder="Digite o nome do responsável"
                     maxLength={50}
+                    autoComplete="off"
                     required
                   />
+                  {mostrarSugestoesClienteResponsavel && sugestoesClienteResponsavel.length > 0 && (
+                    <ul className="usuario-form-sugestoes">
+                      {sugestoesClienteResponsavel.map((c) => (
+                        <li key={c.idCliente} onMouseDown={() => selecionarClienteComoResponsavel(c)}>
+                          {c.NomeCliente}{" "}
+                          <span className="cliente-responsaveis-sugestao-doc">
+                            ({formatarCPF(c.CpfCnpj)})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {errosResponsavel.nomeResponsavel && (
+                    <span className="usuario-form-campo-erro">{errosResponsavel.nomeResponsavel}</span>
+                  )}
                 </div>
 
-                <div className="usuario-form-campo cliente-form-campo-documento">
+                <div
+                  className={`usuario-form-campo cliente-form-campo-documento ${
+                    errosResponsavel.docResponsavel ? "campo-invalido" : ""
+                  }`}
+                >
                   <label htmlFor="rf-doc">CPF</label>
                   <input
                     id="rf-doc"
                     value={docResponsavel}
-                    onChange={(e) => setDocResponsavel(formatarCPF(e.target.value))}
+                    onChange={(e) => {
+                      setDocResponsavel(formatarCPF(e.target.value));
+                      if (errosResponsavel.docResponsavel)
+                        setErrosResponsavel((atual) => ({ ...atual, docResponsavel: "" }));
+                    }}
                     placeholder="000.000.000-00"
                     inputMode="numeric"
                     maxLength={14}
                   />
+                  {errosResponsavel.docResponsavel && (
+                    <span className="usuario-form-campo-erro">{errosResponsavel.docResponsavel}</span>
+                  )}
                 </div>
 
                 <div className="usuario-form-campo usuario-form-campo-status">
@@ -415,6 +519,7 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
                         type="button"
                         className="cliente-responsaveis-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicaoResponsavel(r)}
                       >
                         <Pencil size={16} />
@@ -423,6 +528,7 @@ function ClienteForm({ id, onVoltar }: ClienteFormProps) {
                         type="button"
                         className="cliente-responsaveis-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluirResponsavel(r)}
                       >
                         <Trash2 size={16} />

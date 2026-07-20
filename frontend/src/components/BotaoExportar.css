@@ -1,0 +1,38 @@
+.botao-exportar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.botao-exportar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 180px;
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.botao-exportar-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--cor-texto);
+  text-align: left;
+}
+
+.botao-exportar-menu button:hover {
+  background: var(--cor-fundo-hover);
+}

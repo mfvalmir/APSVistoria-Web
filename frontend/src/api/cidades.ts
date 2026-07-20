@@ -21,8 +21,9 @@ export async function obterCidade(id: number): Promise<Cidade> {
   return data;
 }
 
-export async function criarCidade(dados: DadosCidade): Promise<void> {
-  await api.post("/cidades", dados);
+export async function criarCidade(dados: DadosCidade): Promise<{ idCidade: number }> {
+  const { data } = await api.post("/cidades", dados);
+  return data;
 }
 
 export async function atualizarCidade(id: number, dados: DadosCidade): Promise<void> {

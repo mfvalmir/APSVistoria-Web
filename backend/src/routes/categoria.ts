@@ -62,15 +62,16 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // IdCategoria não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricaoCategoria", sql.VarChar, descricaoCategoria)
       .query(
         `INSERT INTO Categoria (IdCategoria, DescricaoCategoria)
+         OUTPUT INSERTED.IdCategoria
          VALUES ((SELECT ISNULL(MAX(IdCategoria), 0) + 1 FROM Categoria), @descricaoCategoria)`
       );
 
-    res.status(201).json({ mensagem: "Categoria criada" });
+    res.status(201).json({ IdCategoria: result.recordset[0].IdCategoria, mensagem: "Categoria criada" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar categoria" });

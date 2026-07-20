@@ -20,11 +20,18 @@ interface AppShellProps {
   }) => React.ReactNode;
 }
 
+// Abaixo de 1024px a sidebar vira um overlay flutuante (ver AppShell.css/Sidebar.css) em vez de
+// empurrar o conteúdo - por isso já entra fechada nessa faixa, evitando cobrir a tela inteira
+// no primeiro carregamento em tablet.
+function sidebarDeveIniciarAberta(): boolean {
+  return typeof window === "undefined" || window.innerWidth > 1024;
+}
+
 function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: AppShellProps) {
   const [grupos, setGrupos] = useState<GrupoMenu[]>([]);
   const [podeVerInicio, setPodeVerInicio] = useState(false);
   const [carregandoMenu, setCarregandoMenu] = useState(true);
-  const [sidebarAberta, setSidebarAberta] = useState(true);
+  const [sidebarAberta, setSidebarAberta] = useState(sidebarDeveIniciarAberta);
   const [rotaAtual, setRotaAtual] = useState<string | null>(null);
   const [tituloAtual, setTituloAtual] = useState("Início");
   const [grupoAtual, setGrupoAtual] = useState<string | null>(null);
@@ -42,6 +49,9 @@ function AppShell({ nomeUsuario, tema, onAlternarTema, onLogout, children }: App
     setRotaAtual(rota);
     setTituloAtual(nome);
     setGrupoAtual(grupo);
+    // Em tablet a sidebar é um overlay por cima do conteúdo - fecha sozinha ao navegar, senão
+    // ficaria cobrindo a tela recém-aberta até o usuário fechar manualmente.
+    if (!sidebarDeveIniciarAberta()) setSidebarAberta(false);
   }
 
   function irParaInicio() {

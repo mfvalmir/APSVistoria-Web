@@ -19,7 +19,13 @@ const SELECT_BASE = `
     cr.IdPrimeiroTipoPagamento, tp.TipoPagamento AS DescricaoTipoPagamento,
     cr.IntervaloMeses, cr.IdStatusContaReceber, cr.SaldoDevedor,
     cr.DataEmissao, cr.Observacao,
-    cr.idUsuarioEmissao, cr.idUsuarioAlteracao, cr.DataAlteracao
+    cr.idUsuarioEmissao, cr.idUsuarioAlteracao, cr.DataAlteracao,
+    (SELECT COUNT(*) FROM ContaReceberParcela pv
+       WHERE pv.IdContaReceber = cr.IdContaReceber AND pv.IdStatusParcela = 0
+         AND pv.DataVencimento < CAST(GETDATE() AS DATE)) AS ParcelasVencidas,
+    (SELECT COUNT(*) FROM ContaReceberParcela ph
+       WHERE ph.IdContaReceber = cr.IdContaReceber AND ph.IdStatusParcela = 0
+         AND ph.DataVencimento = CAST(GETDATE() AS DATE)) AS ParcelasVencendoHoje
   FROM ContaReceber cr
   LEFT JOIN Cliente cli ON cli.idCliente = cr.idCliente
   LEFT JOIN Categoria c ON c.IdCategoria = cr.idCategoria
@@ -254,10 +260,17 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
     observacao,
   } = req.body;
 
-  if (!descricao || !idCategoria || !valorTotal || totalParcelas === undefined || !dataEmissao) {
-    return res
-      .status(400)
-      .json({ erro: "descricao, idCategoria, valorTotal, totalParcelas e dataEmissao são obrigatórios" });
+  if (
+    !descricao ||
+    !idCategoria ||
+    !valorTotal ||
+    totalParcelas === undefined ||
+    !dataEmissao ||
+    !idPrimeiroTipoPagamento
+  ) {
+    return res.status(400).json({
+      erro: "descricao, idCategoria, valorTotal, totalParcelas, dataEmissao e idPrimeiroTipoPagamento são obrigatórios",
+    });
   }
   if (valorTotal <= 0) return res.status(400).json({ erro: "valorTotal deve ser maior que zero" });
   if (totalParcelas < 0) return res.status(400).json({ erro: "totalParcelas não pode ser negativo" });
@@ -311,10 +324,17 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
     recalcularParcelas,
   } = req.body;
 
-  if (!descricao || !idCategoria || !valorTotal || totalParcelas === undefined || !dataEmissao) {
-    return res
-      .status(400)
-      .json({ erro: "descricao, idCategoria, valorTotal, totalParcelas e dataEmissao são obrigatórios" });
+  if (
+    !descricao ||
+    !idCategoria ||
+    !valorTotal ||
+    totalParcelas === undefined ||
+    !dataEmissao ||
+    !idPrimeiroTipoPagamento
+  ) {
+    return res.status(400).json({
+      erro: "descricao, idCategoria, valorTotal, totalParcelas, dataEmissao e idPrimeiroTipoPagamento são obrigatórios",
+    });
   }
   if (valorTotal <= 0) return res.status(400).json({ erro: "valorTotal deve ser maior que zero" });
   if (totalParcelas < 0) return res.status(400).json({ erro: "totalParcelas não pode ser negativo" });
@@ -364,10 +384,38 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // DELETE /conta-receber/:id - exclusão definitiva do cabeçalho e das parcelas (Manter_ContaReceber @acao='D').
-// Sem exclusão parcial: a procedure sempre apaga parcelas + cabeçalho juntos, mesmo com parcela já paga.
+// A procedure sozinha apagaria parcelas + cabeçalho juntos mesmo com parcela já paga/baixada -
+// por isso a aplicação bloqueia a exclusão nesse caso (ver [[project_exclusao_verifica_vinculo]]),
+// evitando apagar o histórico de uma parcela que já teve baixa/movimento de caixa. Também bloqueia
+// se uma Vistoria ainda aponta pra essa conta (idContaReceber) - excluir deixaria a vistoria com
+// parcelas "sumindo" silenciosamente, mesmo sem nenhuma paga ainda.
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const pool = await getPool();
+
+    const emUso = await pool
+      .request()
+      .input("id", sql.Int, req.params.id)
+      .query(
+        `SELECT TOP 1 IdContaReceberParcela FROM ContaReceberParcela
+         WHERE IdContaReceber = @id AND (IdStatusParcela <> 0 OR ValorPago > 0 OR DataPagamento IS NOT NULL)`
+      );
+    if (emUso.recordset.length > 0) {
+      return res
+        .status(409)
+        .json({ erro: "Não é possível excluir: existe parcela já paga ou baixada nesta conta" });
+    }
+
+    const vinculadaAVistoria = await pool
+      .request()
+      .input("id", sql.Int, req.params.id)
+      .query("SELECT TOP 1 idVistoria FROM Vistoria WHERE idContaReceber = @id");
+    if (vinculadaAVistoria.recordset.length > 0) {
+      return res
+        .status(409)
+        .json({ erro: "Não é possível excluir: esta conta está vinculada a uma vistoria" });
+    }
+
     await chamarManterContaReceber(pool, { acao: "D", idContaReceber: Number(req.params.id) });
     res.json({ mensagem: "Conta a receber excluída" });
   } catch (err: any) {
@@ -408,10 +456,11 @@ router.post("/:idConta/parcelas/:idParcela/baixa", authMiddleware, async (req: A
       .input("idParcela", sql.Int, req.params.idParcela)
       .input("idConta", sql.Int, req.params.idConta)
       .query(
-        `SELECT IdContaReceberParcela, IdContaReceber, NumeroParcela, ValorParcela, DataVencimento,
-                IdStatusParcela, ValorPago, DataPagamento
-         FROM ContaReceberParcela
-         WHERE IdContaReceberParcela = @idParcela AND IdContaReceber = @idConta`
+        `SELECT p.IdContaReceberParcela, p.IdContaReceber, p.NumeroParcela, p.ValorParcela, p.DataVencimento,
+                p.IdStatusParcela, p.ValorPago, p.DataPagamento, cr.Descricao
+         FROM ContaReceberParcela p
+         INNER JOIN ContaReceber cr ON cr.IdContaReceber = p.IdContaReceber
+         WHERE p.IdContaReceberParcela = @idParcela AND p.IdContaReceber = @idConta`
       );
     const parcela = parcelaResult.recordset[0];
     if (!parcela) return res.status(404).json({ erro: "Parcela não encontrada" });
@@ -438,7 +487,7 @@ router.post("/:idConta/parcelas/:idParcela/baixa", authMiddleware, async (req: A
     const observacao = `[Baixa ${agora.toLocaleDateString("pt-BR")} ${agora.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
-    })} | Usuário: ${req.user!.nome} / ${req.user!.id} - ${req.user!.login}] Baixa manual`;
+    })} | ${parcela.Descricao} / ${req.user!.id} - ${req.user!.login}] Baixa manual`;
 
     const transaction = pool.transaction();
     await transaction.begin();
@@ -546,10 +595,11 @@ router.post("/:idConta/parcelas/:idParcela/estorno", authMiddleware, async (req:
       .input("idParcela", sql.Int, req.params.idParcela)
       .input("idConta", sql.Int, req.params.idConta)
       .query(
-        `SELECT IdContaReceberParcela, IdContaReceber, NumeroParcela, ValorParcela, DataVencimento,
-                IdStatusParcela, ValorPago, IdTipoPagamento
-         FROM ContaReceberParcela
-         WHERE IdContaReceberParcela = @idParcela AND IdContaReceber = @idConta`
+        `SELECT p.IdContaReceberParcela, p.IdContaReceber, p.NumeroParcela, p.ValorParcela, p.DataVencimento,
+                p.IdStatusParcela, p.ValorPago, p.IdTipoPagamento, cr.Descricao
+         FROM ContaReceberParcela p
+         INNER JOIN ContaReceber cr ON cr.IdContaReceber = p.IdContaReceber
+         WHERE p.IdContaReceberParcela = @idParcela AND p.IdContaReceber = @idConta`
       );
     const parcela = parcelaResult.recordset[0];
     if (!parcela) return res.status(404).json({ erro: "Parcela não encontrada" });
@@ -557,6 +607,26 @@ router.post("/:idConta/parcelas/:idParcela/estorno", authMiddleware, async (req:
     const paga = parcela.IdStatusParcela !== 0 || parcela.ValorPago > 0;
     if (!paga) {
       return res.status(400).json({ erro: "Esta parcela ainda não foi baixada" });
+    }
+
+    // A baixa original desta parcela gerou uma entrada (TipoOrigem=2) no caixa em que foi feita.
+    // Se esse caixa já foi fechado, o saldo final dele já está calculado e travado - estornar
+    // agora entraria num caixa diferente (o aberto no momento), incoerente com o histórico.
+    const caixaBaixaResult = await pool
+      .request()
+      .input("idParcela", sql.Int, req.params.idParcela)
+      .query(
+        `SELECT TOP 1 c.idCaixa, c.DataFechamento
+         FROM CaixaMovimento m
+         INNER JOIN Caixa c ON c.idCaixa = m.idCaixa
+         WHERE m.TipoOrigem = 2 AND m.idOrigem = @idParcela AND m.TipoMovimento = 'E'
+         ORDER BY m.DataHora DESC`
+      );
+    const caixaDaBaixa = caixaBaixaResult.recordset[0];
+    if (caixaDaBaixa?.DataFechamento) {
+      return res.status(400).json({
+        erro: "Não é possível estornar: o caixa em que esta parcela foi baixada já está fechado.",
+      });
     }
 
     const caixaResult = await pool
@@ -576,7 +646,7 @@ router.post("/:idConta/parcelas/:idParcela/estorno", authMiddleware, async (req:
     const obs = `[Estorno ${agora.toLocaleDateString("pt-BR")} ${agora.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
-    })} | Usuário: ${req.user!.nome} / ${req.user!.id} - ${req.user!.login}] ${String(observacao).trim()}`;
+    })} | ${parcela.Descricao} / ${req.user!.id} - ${req.user!.login}] ${String(observacao).trim()}`;
 
     const transaction = pool.transaction();
     await transaction.begin();

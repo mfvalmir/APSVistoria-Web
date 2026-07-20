@@ -5,12 +5,18 @@ import { listarTiposPagamento, excluirTipoPagamento, TipoPagamento } from "../ap
 import { ItemMenu } from "../api/menu";
 import TipoPagamentoForm from "./TipoPagamentoForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./TipoPagamentoPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -28,6 +34,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -39,6 +46,10 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("tipoPagamento", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("tipoPagamento"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -48,6 +59,12 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
       salvarColunasVisiveis("tipoPagamento", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("tipoPagamento", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -71,15 +88,22 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
   }, [busca, subView]);
 
   async function handleExcluir(tipoPagamento: TipoPagamento) {
-    if (!window.confirm(`Excluir o tipo de pagamento "${tipoPagamento.DescricaoTipoPagamento}"?`)) return;
+    if (
+      !(await confirmar({
+        mensagem: `Excluir o tipo de pagamento "${tipoPagamento.DescricaoTipoPagamento}"?`,
+        perigo: true,
+      }))
+    )
+      return;
     try {
       await excluirTipoPagamento(tipoPagamento.idTipoPagamento);
       carregar();
+      mostrarToast("Tipo de pagamento excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o tipo de pagamento");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o tipo de pagamento", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -103,11 +127,20 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
     return <TipoPagamentoForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(tiposPagamento.length / ITENS_POR_PAGINA));
+  const tiposPagamentoOrdenados = ordenarLista(tiposPagamento, ordenacao, {
+    id: (t) => t.idTipoPagamento,
+    descricao: (t) => t.DescricaoTipoPagamento,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<TipoPagamento>(COLUNAS, colunasVisiveis, {
+    id: (t) => String(t.idTipoPagamento),
+    descricao: (t) => t.DescricaoTipoPagamento,
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(tiposPagamentoOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const tiposPagamentoPagina = tiposPagamento.slice(
-    (paginaAtual - 1) * ITENS_POR_PAGINA,
-    paginaAtual * ITENS_POR_PAGINA
+  const tiposPagamentoPagina = tiposPagamentoOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
   );
 
   return (
@@ -117,6 +150,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
           type="button"
           className="tipo-pagamento-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -132,6 +166,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
               type="button"
               className="tipo-pagamento-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -141,6 +176,15 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
 
         <div className="tipo-pagamento-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="tipos-pagamento"
+            titulo="Tipos de Pagamento"
+            dados={tiposPagamentoOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="tipo-pagamento-btn-criar" onClick={abrirCriacao}>
             Criar Tipo de Pagamento
@@ -148,17 +192,25 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
         )}
       </div>
 
-      <div className="tipo-pagamento-tabela-wrapper">
+      <div className={`tipo-pagamento-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="tipo-pagamento-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
               <th className="tipo-pagamento-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && tiposPagamentoPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="tipo-pagamento-vazio">Carregando...</td>
               </tr>
@@ -176,6 +228,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
                       <button
                         className="tipo-pagamento-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(t.idTipoPagamento)}
                       >
                         <Pencil size={16} />
@@ -185,6 +238,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
                       <button
                         className="tipo-pagamento-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(t)}
                       >
                         <Trash2 size={16} />
@@ -200,6 +254,7 @@ function TipoPagamentoPage({ permissoes, voltarInicio }: TipoPagamentoPageProps)
 
       <div className="tipo-pagamento-rodape">
         <span>{tiposPagamento.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="tipo-pagamento-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

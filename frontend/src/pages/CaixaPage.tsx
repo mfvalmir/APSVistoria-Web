@@ -11,19 +11,27 @@ import {
   ChevronRight,
   ChevronsRight,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 import { listarCaixas, excluirCaixa, obterCaixa, Caixa, MovimentoCaixa, ORIGEM_MOVIMENTO } from "../api/caixa";
 import { ItemMenu } from "../api/menu";
 import CaixaForm from "./CaixaForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import { gerarExtratoCaixa } from "../utils/extratoCaixa";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./CaixaForm.css";
 import "./CaixaPage.css";
 
 type SubView = "lista" | "form";
 type FiltroStatus = "aberto" | "fechado" | "todos";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "Nº" },
@@ -75,6 +83,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -90,10 +99,33 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("caixa", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("caixa"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const [movimentosPorCaixa, setMovimentosPorCaixa] = useState<Record<number, MovimentoCaixa[]>>({});
   const [carregandoMovimentos, setCarregandoMovimentos] = useState<Set<number>>(new Set());
+  const [gerandoExtrato, setGerandoExtrato] = useState(false);
+
+  // Com exatamente 1 caixa expandido (mostrando os movimentos), esse é o "selecionado" pra
+  // exportar - nesse caso o botão gera o extrato dele (cabeçalho + itens) em vez da listagem
+  // genérica. Com 0 ou vários expandidos, mantém a exportação normal da listagem.
+  const idCaixaSelecionadoParaExtrato = expandidos.size === 1 ? Array.from(expandidos)[0] : null;
+
+  async function gerarExtratoCaixaSelecionado() {
+    if (idCaixaSelecionadoParaExtrato === null) return;
+    setGerandoExtrato(true);
+    try {
+      const dados = await obterCaixa(idCaixaSelecionadoParaExtrato);
+      gerarExtratoCaixa(dados, dados.movimentos);
+    } catch {
+      mostrarToast("Não foi possível gerar o extrato do caixa", "erro");
+    } finally {
+      setGerandoExtrato(false);
+    }
+  }
 
   async function alternarExpandir(idCaixa: number) {
     const estavaExpandido = expandidos.has(idCaixa);
@@ -129,6 +161,12 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
     });
   }
 
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("caixa", valor);
+    setPagina(1);
+  }
+
   async function carregar() {
     setCarregando(true);
     try {
@@ -157,19 +195,21 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
 
   async function handleExcluir(caixa: Caixa) {
     if (
-      !window.confirm(
-        `Excluir definitivamente o caixa nº ${pad6(caixa.idCaixa)}? Isso remove também todos os movimentos de caixa vinculados.`
-      )
+      !(await confirmar({
+        mensagem: `Excluir definitivamente o caixa nº ${pad6(caixa.idCaixa)}? Isso remove também todos os movimentos de caixa vinculados.`,
+        perigo: true,
+      }))
     )
       return;
     try {
       await excluirCaixa(caixa.idCaixa);
       carregar();
+      mostrarToast("Caixa excluído com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir o caixa");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir o caixa", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -200,14 +240,44 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
     );
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(caixas.length / ITENS_POR_PAGINA));
+  const caixasOrdenados = ordenarLista(caixas, ordenacao, {
+    id: (c) => c.idCaixa,
+    dataAbertura: (c) => c.DataAbertura,
+    saldoInicial: (c) => c.SaldoInicial,
+    usuarioAbertura: (c) => c.NomeUsuarioAbertura || "",
+    dataFechamento: (c) => c.DataFechamento || "",
+    saldoFinal: (c) => c.SaldoFinal,
+    usuarioFechamento: (c) => c.NomeUsuarioFechamento || "",
+    status: (c) => (c.DataFechamento ? "fechado" : "aberto"),
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Caixa>(COLUNAS, colunasVisiveis, {
+    id: (c) => pad6(c.idCaixa),
+    dataAbertura: (c) => formatarData(c.DataAbertura),
+    saldoInicial: (c) => formatarValor(c.SaldoInicial),
+    usuarioAbertura: (c) => c.NomeUsuarioAbertura || "-",
+    dataFechamento: (c) => formatarData(c.DataFechamento),
+    saldoFinal: (c) => formatarValor(c.SaldoFinal),
+    usuarioFechamento: (c) => c.NomeUsuarioFechamento || "-",
+    status: (c) => (c.DataFechamento ? "FECHADO" : "ABERTO"),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(caixasOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const caixasPagina = caixas.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const caixasPagina = caixasOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="caixa-page">
       <div className="caixa-toolbar">
-        <button type="button" className="caixa-btn-voltar" title="Voltar para Início" onClick={voltarInicio}>
+        <button
+          type="button"
+          className="caixa-btn-voltar"
+          title="Voltar para Início"
+          aria-label="Voltar para Início"
+          onClick={voltarInicio}
+        >
           <ArrowLeft size={18} />
         </button>
 
@@ -217,7 +287,13 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
           <Search size={16} />
           <input placeholder="Buscar..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && (
-            <button type="button" className="caixa-busca-limpar" title="Limpar busca" onClick={() => setBusca("")}>
+            <button
+              type="button"
+              className="caixa-busca-limpar"
+              title="Limpar busca"
+              aria-label="Limpar busca"
+              onClick={() => setBusca("")}
+            >
               <X size={14} />
             </button>
           )}
@@ -242,6 +318,28 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
 
         <div className="caixa-toolbar-espaco" />
 
+        {podeExportar && idCaixaSelecionadoParaExtrato !== null ? (
+          <button
+            type="button"
+            className="caixa-btn-extrato"
+            title="Gerar extrato do caixa selecionado, com os movimentos"
+            onClick={gerarExtratoCaixaSelecionado}
+            disabled={gerandoExtrato}
+          >
+            <FileText size={16} />
+            {gerandoExtrato ? "Gerando..." : "Extrato do caixa"}
+          </button>
+        ) : (
+          podeExportar && (
+            <BotaoExportar
+              nomeArquivo="caixa"
+              titulo="Caixa"
+              dados={caixasOrdenados}
+              colunas={colunasExportacao}
+            />
+          )
+        )}
+
         {podeAdicionar && (
           <button
             className="caixa-btn-criar"
@@ -254,24 +352,71 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
         )}
       </div>
 
-      <div className="caixa-tabela-wrapper">
+      <div className={`caixa-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="caixa-tabela">
           <thead>
             <tr>
               <th className="caixa-col-expandir"></th>
-              {colunasVisiveis.has("id") && <th>Nº</th>}
-              {colunasVisiveis.has("dataAbertura") && <th>Dt. Abertura</th>}
-              {colunasVisiveis.has("saldoInicial") && <th className="caixa-col-valor">Saldo Inicial</th>}
-              {colunasVisiveis.has("usuarioAbertura") && <th>Funcionário de Abertura</th>}
-              {colunasVisiveis.has("dataFechamento") && <th>Dt. Fechamento</th>}
-              {colunasVisiveis.has("saldoFinal") && <th className="caixa-col-valor">Saldo Final</th>}
-              {colunasVisiveis.has("usuarioFechamento") && <th>Funcionário de Fechamento</th>}
-              {colunasVisiveis.has("status") && <th className="caixa-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Nº
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("dataAbertura") && (
+                <ThOrdenavel campo="dataAbertura" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Dt. Abertura
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("saldoInicial") && (
+                <ThOrdenavel
+                  campo="saldoInicial"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="caixa-col-valor"
+                >
+                  Saldo Inicial
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("usuarioAbertura") && (
+                <ThOrdenavel campo="usuarioAbertura" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Funcionário de Abertura
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("dataFechamento") && (
+                <ThOrdenavel campo="dataFechamento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Dt. Fechamento
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("saldoFinal") && (
+                <ThOrdenavel
+                  campo="saldoFinal"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="caixa-col-valor"
+                >
+                  Saldo Final
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("usuarioFechamento") && (
+                <ThOrdenavel campo="usuarioFechamento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Funcionário de Fechamento
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="caixa-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="caixa-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && caixasPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 2} className="caixa-vazio">
                   Carregando...
@@ -302,6 +447,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
                           type="button"
                           className={`caixa-btn-expandir ${expandido ? "aberto" : ""}`}
                           title={expandido ? "Ocultar movimentos" : "Ver movimentos"}
+                          aria-label={expandido ? "Ocultar movimentos" : "Ver movimentos"}
                           onClick={() => alternarExpandir(c.idCaixa)}
                         >
                           <ChevronDown size={16} />
@@ -330,6 +476,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
                         <button
                           className="caixa-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(c.idCaixa)}
                         >
                           <Pencil size={16} />
@@ -339,6 +486,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
                         <button
                           className="caixa-icone-acao perigo"
                           title="Excluir"
+                          aria-label="Excluir"
                           onClick={() => handleExcluir(c)}
                         >
                           <Trash2 size={16} />
@@ -406,6 +554,7 @@ function CaixaPage({ permissoes, navegarPara, voltarInicio }: CaixaPageProps) {
 
       <div className="caixa-rodape">
         <span>{caixas.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="caixa-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

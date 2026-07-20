@@ -186,7 +186,7 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // IdFuncionario não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("nomeFuncionario", sql.VarChar, nomeFuncionario)
       .input("endereco", sql.VarChar, endereco || null)
@@ -210,13 +210,14 @@ router.post("/", authMiddleware, async (req, res) => {
            (IdFuncionario, NomeFuncionario, Endereco, CEP, idBairro, TelCelular, TelResidencial,
             idFuncao, FazVistoria, DataAdmissao, Salario, IDBanco, Agencia, NumContaBanco,
             CPF, ChavePix, DataNascimento, Observacao, Situacao)
+         OUTPUT INSERTED.IdFuncionario
          VALUES
            ((SELECT ISNULL(MAX(IdFuncionario), 0) + 1 FROM Funcionario), @nomeFuncionario, @endereco, @cep,
             @idBairro, @telCelular, @telResidencial, @idFuncao, @fazVistoria, @dataAdmissao, @salario,
             @idBanco, @agencia, @numContaBanco, @cpf, @chavePix, @dataNascimento, @observacao, 'A')`
       );
 
-    res.status(201).json({ mensagem: "Funcionário criado" });
+    res.status(201).json({ idFuncionario: result.recordset[0].IdFuncionario, mensagem: "Funcionário criado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar funcionário" });

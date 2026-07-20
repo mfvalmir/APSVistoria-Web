@@ -19,8 +19,9 @@ export async function obterCategoria(id: number): Promise<Categoria> {
   return data;
 }
 
-export async function criarCategoria(dados: DadosCategoria): Promise<void> {
-  await api.post("/categoria", dados);
+export async function criarCategoria(dados: DadosCategoria): Promise<{ IdCategoria: number }> {
+  const { data } = await api.post("/categoria", dados);
+  return data;
 }
 
 export async function atualizarCategoria(id: number, dados: DadosCategoria): Promise<void> {

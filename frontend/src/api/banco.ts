@@ -19,8 +19,9 @@ export async function obterBanco(id: number): Promise<Banco> {
   return data;
 }
 
-export async function criarBanco(dados: DadosBanco): Promise<void> {
-  await api.post("/banco", dados);
+export async function criarBanco(dados: DadosBanco): Promise<{ idBanco: number }> {
+  const { data } = await api.post("/banco", dados);
+  return data;
 }
 
 export async function atualizarBanco(id: number, dados: DadosBanco): Promise<void> {

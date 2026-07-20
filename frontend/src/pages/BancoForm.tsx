@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Send } from "lucide-react";
 import { obterBanco, criarBanco, atualizarBanco } from "../api/banco";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 
 interface BancoFormProps {
@@ -18,6 +19,8 @@ function BancoForm({ id, onVoltar }: BancoFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -30,10 +33,10 @@ function BancoForm({ id, onVoltar }: BancoFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricaoBanco) {
-      setErro("Informe a descrição");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricaoBanco.trim()) novosErros.descricaoBanco = "Informe a descrição";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     const dados = { descricaoBanco };
 
@@ -41,8 +44,10 @@ function BancoForm({ id, onVoltar }: BancoFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarBanco(id, dados);
+        mostrarToast("Banco atualizado com sucesso", "sucesso");
       } else {
         await criarBanco(dados);
+        mostrarToast("Banco criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -69,20 +74,24 @@ function BancoForm({ id, onVoltar }: BancoFormProps) {
         <h2>{modoEdicao ? "Editar Banco" : "Novo Banco"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricaoBanco ? "campo-invalido" : ""}`}>
             <label htmlFor="bf-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="bf-descricao"
               value={descricaoBanco}
-              onChange={(e) => setDescricaoBanco(e.target.value)}
+              onChange={(e) => {
+                setDescricaoBanco(e.target.value);
+                if (erros.descricaoBanco) setErros((atual) => ({ ...atual, descricaoBanco: "" }));
+              }}
               placeholder="Digite a descrição do banco"
               maxLength={50}
               required
             />
+            {erros.descricaoBanco && <span className="usuario-form-campo-erro">{erros.descricaoBanco}</span>}
           </div>
         </div>
 

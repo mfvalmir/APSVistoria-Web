@@ -1,0 +1,18 @@
+.th-ordenavel {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-ordenavel:hover {
+  background: var(--cor-fundo-hover);
+}
+
+.th-ordenavel-conteudo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.th-ordenavel-icone-inativo {
+  opacity: 0.35;
+}

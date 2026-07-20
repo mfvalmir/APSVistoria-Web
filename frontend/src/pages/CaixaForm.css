@@ -125,7 +125,7 @@ table.caixa-form-movimentos-tabela th {
 }
 
 table.caixa-form-movimentos-tabela td {
-  padding: 6px 10px;
+  padding: 3px 10px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
   white-space: nowrap;
@@ -179,6 +179,14 @@ table.caixa-form-movimentos-tabela tbody tr:last-child td {
 
 table.caixa-form-movimentos-tabela tbody tr:nth-child(even) {
   background: var(--cor-fundo-secundario);
+}
+
+table.caixa-form-movimentos-tabela tbody tr:hover td {
+  background: #cfe0f2;
+}
+
+:root[data-theme="dark"] table.caixa-form-movimentos-tabela tbody tr:hover td {
+  background: #2c3540;
 }
 
 table.caixa-form-movimentos-tabela td.caixa-form-movimentos-descricao {

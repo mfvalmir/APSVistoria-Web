@@ -23,8 +23,9 @@ export async function obterBairro(id: number): Promise<Bairro> {
   return data;
 }
 
-export async function criarBairro(dados: DadosBairro): Promise<void> {
-  await api.post("/bairros", dados);
+export async function criarBairro(dados: DadosBairro): Promise<{ IDBairro: number }> {
+  const { data } = await api.post("/bairros", dados);
+  return data;
 }
 
 export async function atualizarBairro(id: number, dados: DadosBairro): Promise<void> {

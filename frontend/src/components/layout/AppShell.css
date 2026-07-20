@@ -15,3 +15,18 @@
   padding: 24px;
   background-color: var(--cor-fundo);
 }
+
+/* Tablet: a sidebar passa a flutuar por cima do conteúdo (position: fixed em Sidebar.css) em
+   vez de dividir a largura da tela com ele - por isso aqui ela sai da grid (só resta "content"). */
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-areas:
+      "header"
+      "content";
+    grid-template-columns: 1fr;
+  }
+
+  .app-content {
+    padding: 16px;
+  }
+}

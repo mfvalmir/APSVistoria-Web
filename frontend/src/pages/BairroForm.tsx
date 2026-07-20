@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ExternalLink, Send } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Send } from "lucide-react";
 import { obterBairro, criarBairro, atualizarBairro } from "../api/bairros";
 import { listarCidades, Cidade } from "../api/cidades";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
+import CidadeModal from "./CidadeModal";
 import "./UsuarioForm.css";
 
 interface BairroFormProps {
@@ -12,21 +14,30 @@ interface BairroFormProps {
   navegarPara?: (rota: string, nome: string, grupo: string) => void;
 }
 
-function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
+function BairroForm({ id, onVoltar }: BairroFormProps) {
   const modoEdicao = id !== null;
 
   const [descricaoBairro, setDescricaoBairro] = useState("");
   const [idCidade, setIdCidade] = useState<number | null>(null);
 
   const [cidades, setCidades] = useState<Cidade[]>([]);
+  const [mostrarModalCidade, setMostrarModalCidade] = useState(false);
 
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     listarCidades().then(setCidades);
   }, []);
+
+  function handleCidadeCriada(cidade: Cidade) {
+    setCidades((atual) => [...atual, cidade].sort((a, b) => a.DescricaoCidade.localeCompare(b.DescricaoCidade)));
+    setIdCidade(cidade.idCidade);
+    setMostrarModalCidade(false);
+  }
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -42,10 +53,11 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!descricaoBairro || !idCidade) {
-      setErro("Informe o bairro e a cidade");
-      return;
-    }
+    const novosErros: Record<string, string> = {};
+    if (!descricaoBairro.trim()) novosErros.descricaoBairro = "Informe o bairro";
+    if (!idCidade) novosErros.idCidade = "Informe a cidade";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0 || !idCidade) return;
 
     const dados = { descricaoBairro, idCidade };
 
@@ -53,8 +65,10 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarBairro(id, dados);
+        mostrarToast("Bairro atualizado com sucesso", "sucesso");
       } else {
         await criarBairro(dados);
+        mostrarToast("Bairro criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -81,23 +95,27 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
         <h2>{modoEdicao ? "Editar Bairro" : "Novo Bairro"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricaoBairro ? "campo-invalido" : ""}`}>
             <label htmlFor="bf-descricao">
               Bairro <span className="obrigatorio">*</span>
             </label>
             <input
               id="bf-descricao"
               value={descricaoBairro}
-              onChange={(e) => setDescricaoBairro(e.target.value)}
+              onChange={(e) => {
+                setDescricaoBairro(e.target.value);
+                if (erros.descricaoBairro) setErros((atual) => ({ ...atual, descricaoBairro: "" }));
+              }}
               placeholder="Digite o nome do bairro"
               maxLength={100}
               required
             />
+            {erros.descricaoBairro && <span className="usuario-form-campo-erro">{erros.descricaoBairro}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.idCidade ? "campo-invalido" : ""}`}>
             <label htmlFor="bf-cidade">
               Cidade <span className="obrigatorio">*</span>
             </label>
@@ -105,7 +123,10 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
               <select
                 id="bf-cidade"
                 value={idCidade ?? ""}
-                onChange={(e) => setIdCidade(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setIdCidade(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idCidade) setErros((atual) => ({ ...atual, idCidade: "" }));
+                }}
                 required
               >
                 <option value="">Selecione...</option>
@@ -118,12 +139,14 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Cidades"
-                onClick={() => navegarPara?.("cidades", "Cadastro de Cidades", "Cadastros")}
+                title="Cadastrar nova cidade"
+                aria-label="Cadastrar nova cidade"
+                onClick={() => setMostrarModalCidade(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idCidade && <span className="usuario-form-campo-erro">{erros.idCidade}</span>}
           </div>
         </div>
 
@@ -134,6 +157,10 @@ function BairroForm({ id, onVoltar, navegarPara }: BairroFormProps) {
           <Send size={16} />
         </button>
       </form>
+
+      {mostrarModalCidade && (
+        <CidadeModal onCancelar={() => setMostrarModalCidade(false)} onCriada={handleCidadeCriada} />
+      )}
     </div>
   );
 }

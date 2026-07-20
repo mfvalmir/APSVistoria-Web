@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ExternalLink, Send, Banknote, Undo2 } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Send, Banknote, Undo2 } from "lucide-react";
 import {
   obterContaPagar,
   criarContaPagar,
@@ -15,6 +15,10 @@ import { focarProximoCampoAoEnter } from "../utils/form";
 import { ItemMenu } from "../api/menu";
 import ContaPagarBaixaModal from "./ContaPagarBaixaModal";
 import ContaPagarEstornoModal from "./ContaPagarEstornoModal";
+import FornecedorModal from "./FornecedorModal";
+import CategoriaModal from "./CategoriaModal";
+import TipoPagamentoModal from "./TipoPagamentoModal";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 import "./ContaPagarForm.css";
 
@@ -65,6 +69,19 @@ function parcelaPaga(p: ParcelaContaPagar): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
+function classeVencimento(dataVencimento: string, paga: boolean): string {
+  if (paga) return "";
+  const venc = dataVencimento.slice(0, 10);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  if (venc < hojeStr) return "conta-pagar-vencimento-vencida";
+  if (venc === hojeStr) return "conta-pagar-vencimento-hoje";
+  return "";
+}
+
+function parcelaEstornada(p: ParcelaContaPagar): boolean {
+  return !!p.Observacao?.startsWith("[Estorno");
+}
+
 function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFormProps) {
   const modoEdicao = id !== null;
 
@@ -90,10 +107,15 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
   const [tiposPagamento, setTiposPagamento] = useState<TipoPagamento[]>([]);
   const [sugestoesFornecedor, setSugestoesFornecedor] = useState<Fornecedor[]>([]);
   const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
+  const [mostrarModalFornecedor, setMostrarModalFornecedor] = useState(false);
+  const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false);
+  const [mostrarModalTipoPagamento, setMostrarModalTipoPagamento] = useState(false);
 
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaContaPagar | null>(null);
   const [parcelaEmEstorno, setParcelaEmEstorno] = useState<ParcelaContaPagar | null>(null);
@@ -136,11 +158,13 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
   async function handleParcelaBaixada() {
     setParcelaEmBaixa(null);
     await carregarConta();
+    mostrarToast("Parcela baixada com sucesso", "sucesso");
   }
 
   async function handleParcelaEstornada() {
     setParcelaEmEstorno(null);
     await carregarConta();
+    mostrarToast("Baixa estornada com sucesso", "sucesso");
   }
 
   useEffect(() => {
@@ -161,24 +185,44 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
     setMostrarSugestoesFornecedor(false);
   }
 
+  function handleFornecedorCriado(f: Fornecedor) {
+    selecionarFornecedor(f);
+    setMostrarModalFornecedor(false);
+  }
+
+  function handleCategoriaCriada(c: Categoria) {
+    setCategorias((atual) => [...atual, c].sort((a, b) => a.DescricaoCategoria.localeCompare(b.DescricaoCategoria)));
+    setIdCategoria(c.IdCategoria);
+    setMostrarModalCategoria(false);
+  }
+
+  function handleTipoPagamentoCriado(t: TipoPagamento) {
+    setTiposPagamento((atual) =>
+      [...atual, t].sort((a, b) => a.DescricaoTipoPagamento.localeCompare(b.DescricaoTipoPagamento))
+    );
+    setIdPrimeiroTipoPagamento(t.idTipoPagamento);
+    setMostrarModalTipoPagamento(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
 
-    if (!descricao || !idCategoria || !valorTotal || !dataEmissao) {
-      setErro("Informe descrição, categoria, valor total e data de emissão");
-      return;
-    }
     const valor = moedaParaNumero(valorTotal);
-    if (valor <= 0) {
-      setErro("O valor total deve ser maior que zero");
-      return;
-    }
     const parcelasNum = Number(totalParcelas || 0);
-    if (parcelasNum < 0) {
-      setErro("O total de parcelas não pode ser negativo");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!descricao.trim()) novosErros.descricao = "Informe a descrição";
+    if (!idCategoria) novosErros.idCategoria = "Informe a categoria";
+    if (!valorTotal) {
+      novosErros.valorTotal = "Informe o valor total";
+    } else if (valor <= 0) {
+      novosErros.valorTotal = "O valor total deve ser maior que zero";
     }
+    if (!dataEmissao) novosErros.dataEmissao = "Informe a data de emissão";
+    if (parcelasNum < 0) novosErros.totalParcelas = "O total de parcelas não pode ser negativo";
+    if (!idPrimeiroTipoPagamento) novosErros.idPrimeiroTipoPagamento = "Informe o tipo de pagamento";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0 || !idCategoria) return;
 
     const dados = {
       numeroDocumento: numeroDocumento || undefined,
@@ -199,8 +243,10 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
     try {
       if (modoEdicao && id !== null) {
         await atualizarContaPagar(id, { ...dados, recalcularParcelas: algumaParcelaPaga ? false : recalcularParcelas });
+        mostrarToast("Conta a pagar atualizada com sucesso", "sucesso");
       } else {
         await criarContaPagar(dados);
+        mostrarToast("Conta a pagar criada com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -227,7 +273,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
         <h2>{modoEdicao ? "Editar Conta a Pagar" : "Nova Conta a Pagar"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
           <div className="usuario-form-campo conta-pagar-form-campo-documento">
             <label htmlFor="cp-numero-documento">Nº Documento</label>
@@ -240,7 +286,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-data">
+          <div className={`usuario-form-campo conta-pagar-form-campo-data ${erros.dataEmissao ? "campo-invalido" : ""}`}>
             <label htmlFor="cp-data-emissao">
               Data de Emissão <span className="obrigatorio">*</span>
             </label>
@@ -248,23 +294,31 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               id="cp-data-emissao"
               type="date"
               value={dataEmissao}
-              onChange={(e) => setDataEmissao(e.target.value)}
+              onChange={(e) => {
+                setDataEmissao(e.target.value);
+                if (erros.dataEmissao) setErros((atual) => ({ ...atual, dataEmissao: "" }));
+              }}
               required
             />
+            {erros.dataEmissao && <span className="usuario-form-campo-erro">{erros.dataEmissao}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricao ? "campo-invalido" : ""}`}>
             <label htmlFor="cp-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="cp-descricao"
               value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
+              onChange={(e) => {
+                setDescricao(e.target.value);
+                if (erros.descricao) setErros((atual) => ({ ...atual, descricao: "" }));
+              }}
               placeholder="Digite a descrição"
               maxLength={255}
               required
             />
+            {erros.descricao && <span className="usuario-form-campo-erro">{erros.descricao}</span>}
           </div>
 
           <div className="usuario-form-campo conta-pagar-form-campo-status">
@@ -300,10 +354,11 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Fornecedores"
-                onClick={() => navegarPara?.("fornecedor", "Cadastro de Fornecedores", "Cadastros")}
+                title="Cadastrar novo fornecedor"
+                aria-label="Cadastrar novo fornecedor"
+                onClick={() => setMostrarModalFornecedor(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
             {mostrarSugestoesFornecedor && sugestoesFornecedor.length > 0 && (
@@ -317,7 +372,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             )}
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-categoria-larga">
+          <div className={`usuario-form-campo conta-pagar-form-campo-categoria-larga ${erros.idCategoria ? "campo-invalido" : ""}`}>
             <label htmlFor="cp-categoria">
               Categoria <span className="obrigatorio">*</span>
             </label>
@@ -325,7 +380,10 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               <select
                 id="cp-categoria"
                 value={idCategoria ?? ""}
-                onChange={(e) => setIdCategoria(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setIdCategoria(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idCategoria) setErros((atual) => ({ ...atual, idCategoria: "" }));
+                }}
                 required
               >
                 <option value="">Selecione...</option>
@@ -338,31 +396,37 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Categorias"
-                onClick={() => navegarPara?.("categoria", "Cadastro de Categorias", "Cadastros")}
+                title="Cadastrar nova categoria"
+                aria-label="Cadastrar nova categoria"
+                onClick={() => setMostrarModalCategoria(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idCategoria && <span className="usuario-form-campo-erro">{erros.idCategoria}</span>}
           </div>
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-pagar-form-campo-valor">
+          <div className={`usuario-form-campo conta-pagar-form-campo-valor ${erros.valorTotal ? "campo-invalido" : ""}`}>
             <label htmlFor="cp-valor-total">
               Valor Total <span className="obrigatorio">*</span>
             </label>
             <input
               id="cp-valor-total"
               value={valorTotal}
-              onChange={(e) => setValorTotal(formatarMoeda(e.target.value))}
+              onChange={(e) => {
+                setValorTotal(formatarMoeda(e.target.value));
+                if (erros.valorTotal) setErros((atual) => ({ ...atual, valorTotal: "" }));
+              }}
               placeholder="R$ 0,00"
               inputMode="numeric"
               required
             />
+            {erros.valorTotal && <span className="usuario-form-campo-erro">{erros.valorTotal}</span>}
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-numero">
+          <div className={`usuario-form-campo conta-pagar-form-campo-numero ${erros.totalParcelas ? "campo-invalido" : ""}`}>
             <label htmlFor="cp-total-parcelas">
               Total de Parcelas <span className="obrigatorio">*</span>
             </label>
@@ -371,9 +435,13 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               type="number"
               min={0}
               value={totalParcelas}
-              onChange={(e) => setTotalParcelas(e.target.value)}
+              onChange={(e) => {
+                setTotalParcelas(e.target.value);
+                if (erros.totalParcelas) setErros((atual) => ({ ...atual, totalParcelas: "" }));
+              }}
               required
             />
+            {erros.totalParcelas && <span className="usuario-form-campo-erro">{erros.totalParcelas}</span>}
           </div>
 
           <div className="usuario-form-campo conta-pagar-form-campo-data">
@@ -397,13 +465,24 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
             />
           </div>
 
-          <div className="usuario-form-campo conta-pagar-form-campo-tipo-pagamento">
-            <label htmlFor="cp-tipo-pagamento">Tipo de Pagamento</label>
+          <div
+            className={`usuario-form-campo conta-pagar-form-campo-tipo-pagamento ${
+              erros.idPrimeiroTipoPagamento ? "campo-invalido" : ""
+            }`}
+          >
+            <label htmlFor="cp-tipo-pagamento">
+              Tipo de Pagamento <span className="obrigatorio">*</span>
+            </label>
             <div className="usuario-form-campo-com-acao">
               <select
                 id="cp-tipo-pagamento"
                 value={idPrimeiroTipoPagamento ?? ""}
-                onChange={(e) => setIdPrimeiroTipoPagamento(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setIdPrimeiroTipoPagamento(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idPrimeiroTipoPagamento)
+                    setErros((atual) => ({ ...atual, idPrimeiroTipoPagamento: "" }));
+                }}
+                required
               >
                 <option value="">Selecione...</option>
                 {tiposPagamento.map((t) => (
@@ -415,12 +494,16 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Tipos de Pagamento"
-                onClick={() => navegarPara?.("tipo-pagamento", "Cadastro de Tipos de Pagamento", "Cadastros")}
+                title="Cadastrar novo tipo de pagamento"
+                aria-label="Cadastrar novo tipo de pagamento"
+                onClick={() => setMostrarModalTipoPagamento(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idPrimeiroTipoPagamento && (
+              <span className="usuario-form-campo-erro">{erros.idPrimeiroTipoPagamento}</span>
+            )}
           </div>
 
           {modoEdicao && saldoDevedor !== null && (
@@ -469,6 +552,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                 <thead>
                   <tr>
                     <th>Nº</th>
+                    <th>Cód. Parcela</th>
                     <th>Vencimento</th>
                     <th className="conta-pagar-col-valor">Valor</th>
                     <th className="conta-pagar-col-valor">Pago</th>
@@ -487,7 +571,10 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                     return (
                       <tr key={p.IdContaPagarParcela}>
                         <td>{pad3(p.NumeroParcela)}</td>
-                        <td>{new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</td>
+                        <td>{p.IdContaPagarParcela}</td>
+                        <td className={classeVencimento(p.DataVencimento, paga)}>
+                          {new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                        </td>
                         <td className="conta-pagar-col-valor">{numeroParaMoeda(p.ValorParcela)}</td>
                         <td className="conta-pagar-col-valor">{numeroParaMoeda(p.ValorPago)}</td>
                         <td>
@@ -498,6 +585,9 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                         <td>{p.DescricaoTipoPagamento || "-"}</td>
                         <td>
                           <span className={`conta-pagar-badge ${classe}`}>{label.toUpperCase()}</span>
+                          {parcelaEstornada(p) && (
+                            <span className="conta-pagar-badge-estornada" title="Parcela estornada" />
+                          )}
                         </td>
                         {(podeBaixarParcela || podeEstornarParcela) && (
                           <td className="conta-pagar-col-acoes">
@@ -506,6 +596,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                                 type="button"
                                 className="conta-pagar-icone-acao"
                                 title="Dar baixa nesta parcela"
+                                aria-label="Dar baixa nesta parcela"
                                 onClick={() => setParcelaEmBaixa(p)}
                               >
                                 <Banknote size={16} />
@@ -516,6 +607,7 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
                                 type="button"
                                 className="conta-pagar-icone-acao estorno"
                                 title="Estornar a baixa desta parcela"
+                                aria-label="Estornar a baixa desta parcela"
                                 onClick={() => setParcelaEmEstorno(p)}
                               >
                                 <Undo2 size={16} />
@@ -555,6 +647,21 @@ function ContaPagarForm({ id, onVoltar, navegarPara, permissoes }: ContaPagarFor
           parcela={parcelaEmEstorno}
           onCancelar={() => setParcelaEmEstorno(null)}
           onEstornada={handleParcelaEstornada}
+        />
+      )}
+
+      {mostrarModalFornecedor && (
+        <FornecedorModal onCancelar={() => setMostrarModalFornecedor(false)} onCriado={handleFornecedorCriado} />
+      )}
+
+      {mostrarModalCategoria && (
+        <CategoriaModal onCancelar={() => setMostrarModalCategoria(false)} onCriada={handleCategoriaCriada} />
+      )}
+
+      {mostrarModalTipoPagamento && (
+        <TipoPagamentoModal
+          onCancelar={() => setMostrarModalTipoPagamento(false)}
+          onCriado={handleTipoPagamentoCriado}
         />
       )}
     </div>

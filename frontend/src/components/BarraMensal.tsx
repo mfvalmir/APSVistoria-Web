@@ -4,7 +4,7 @@ import "./BarraMensal.css";
 interface BarraMensalProps {
   titulo: string;
   dados: { rotulo: string; valor: number }[];
-  cor: "sequencial-1" | "sequencial-2";
+  cor: "sequencial-1" | "sequencial-2" | "sequencial-3";
   formatarValor: (valor: number) => string;
 }
 

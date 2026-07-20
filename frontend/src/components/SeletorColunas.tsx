@@ -33,6 +33,7 @@ function SeletorColunas({ colunas, visiveis, onToggle }: SeletorColunasProps) {
         type="button"
         className="seletor-colunas-btn"
         title="Colunas"
+        aria-label="Colunas"
         onClick={() => setAberto((v) => !v)}
       >
         <Columns3 size={16} />

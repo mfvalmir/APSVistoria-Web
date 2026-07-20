@@ -26,8 +26,9 @@ export async function obterServico(id: number): Promise<Servico> {
   return data;
 }
 
-export async function criarServico(dados: DadosServico): Promise<void> {
-  await api.post("/servico", dados);
+export async function criarServico(dados: DadosServico): Promise<{ idServico: number }> {
+  const { data } = await api.post<{ idServico: number }>("/servico", dados);
+  return data;
 }
 
 export async function atualizarServico(id: number, dados: EdicaoServico): Promise<void> {

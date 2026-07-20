@@ -29,6 +29,8 @@ export interface ContaReceber {
   idUsuarioEmissao: number;
   idUsuarioAlteracao: number | null;
   DataAlteracao: string | null;
+  ParcelasVencidas: number;
+  ParcelasVencendoHoje: number;
 }
 
 export interface ParcelaContaReceber {

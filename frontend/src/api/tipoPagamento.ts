@@ -14,15 +14,18 @@ export async function listarTiposPagamento(busca?: string): Promise<TipoPagament
   return data;
 }
 
-// "Retorno" e "Cortesia" são tipos usados só em Vistoria - não fazem sentido como forma de
-// pagamento em Conta a Pagar/Receber, então ficam de fora desses dois fluxos.
-const TIPOS_OCULTOS_EM_CONTA_PAGAR_RECEBER = ["retorno", "cortesia"];
+// "Retorno" e "Cortesia" são tipos usados só em Vistoria (pra quando o valor é 0, sem cobrança
+// real) - não fazem sentido como forma de pagamento em Conta a Pagar/Receber, então ficam de
+// fora desses dois fluxos.
+export const TIPOS_RETORNO_CORTESIA = ["retorno", "cortesia"];
+
+export function ehTipoRetornoOuCortesia(descricao: string): boolean {
+  return TIPOS_RETORNO_CORTESIA.includes(descricao.trim().toLowerCase());
+}
 
 export async function listarTiposPagamentoPadrao(): Promise<TipoPagamento[]> {
   const tipos = await listarTiposPagamento();
-  return tipos.filter(
-    (t) => !TIPOS_OCULTOS_EM_CONTA_PAGAR_RECEBER.includes(t.DescricaoTipoPagamento.trim().toLowerCase())
-  );
+  return tipos.filter((t) => !ehTipoRetornoOuCortesia(t.DescricaoTipoPagamento));
 }
 
 export async function obterTipoPagamento(id: number): Promise<TipoPagamento> {
@@ -30,8 +33,9 @@ export async function obterTipoPagamento(id: number): Promise<TipoPagamento> {
   return data;
 }
 
-export async function criarTipoPagamento(dados: DadosTipoPagamento): Promise<void> {
-  await api.post("/tipo-pagamento", dados);
+export async function criarTipoPagamento(dados: DadosTipoPagamento): Promise<{ idTipoPagamento: number }> {
+  const { data } = await api.post("/tipo-pagamento", dados);
+  return data;
 }
 
 export async function atualizarTipoPagamento(id: number, dados: DadosTipoPagamento): Promise<void> {

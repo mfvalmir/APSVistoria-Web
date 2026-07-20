@@ -19,6 +19,7 @@ import CaixaPage from "./pages/CaixaPage";
 import VistoriaPage from "./pages/VistoriaPage";
 import Placeholder from "./pages/Placeholder";
 import Inicio from "./pages/Inicio";
+import OfflineBanner from "./components/OfflineBanner";
 import { decodeToken } from "./utils/jwt";
 import { obterTemaInicial, aplicarTema, Tema } from "./utils/theme";
 
@@ -68,179 +69,187 @@ function App() {
   }
 
   if (!autenticado) {
-    return <Login onLoginSuccess={() => setAutenticado(true)} />;
+    return (
+      <>
+        <OfflineBanner />
+        <Login onLoginSuccess={() => setAutenticado(true)} />
+      </>
+    );
   }
 
   return (
-    <AppShell
-      nomeUsuario={nomeUsuarioLogado()}
-      tema={tema}
-      onAlternarTema={alternarTema}
-      onLogout={handleLogout}
-    >
-      {({ rota, titulo, permissoes, podeVerInicio, navegarPara, irParaInicio }) => {
-        if (rota === "usuario") {
-          return (
-            <UsuariosPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "funcionarios") {
-          return (
-            <FuncionariosPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "formularios") {
-          return (
-            <FormulariosPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "cidades") {
-          return (
-            <CidadesPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "bairros") {
-          return (
-            <BairrosPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "funcao") {
-          return (
-            <FuncaoPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "categoria") {
-          return (
-            <CategoriaPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "banco") {
-          return (
-            <BancoPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "clientes") {
-          return (
-            <ClientesPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "servicos") {
-          return (
-            <ServicoPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "tipo-pagamento") {
-          return (
-            <TipoPagamentoPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "fornecedor") {
-          return (
-            <FornecedorPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "conta-pagar") {
-          return (
-            <ContaPagarPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "conta-receber") {
-          return (
-            <ContaReceberPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "caixa") {
-          return (
-            <CaixaPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === "vistoria") {
-          return (
-            <VistoriaPage
-              permissoes={permissoes}
-              administrador={administradorLogado()}
-              navegarPara={navegarPara}
-              voltarInicio={irParaInicio}
-            />
-          );
-        }
-        if (rota === null) {
-          return podeVerInicio ? (
-            <Inicio />
-          ) : (
-            <div>
-              <h2>Bem-vindo(a), {nomeUsuarioLogado()}!</h2>
-            </div>
-          );
-        }
-        return <Placeholder titulo={titulo} />;
-      }}
-    </AppShell>
+    <>
+      <OfflineBanner />
+      <AppShell
+        nomeUsuario={nomeUsuarioLogado()}
+        tema={tema}
+        onAlternarTema={alternarTema}
+        onLogout={handleLogout}
+      >
+        {({ rota, titulo, permissoes, podeVerInicio, navegarPara, irParaInicio }) => {
+          if (rota === "usuario") {
+            return (
+              <UsuariosPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "funcionarios") {
+            return (
+              <FuncionariosPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "formularios") {
+            return (
+              <FormulariosPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "cidades") {
+            return (
+              <CidadesPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "bairros") {
+            return (
+              <BairrosPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "funcao") {
+            return (
+              <FuncaoPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "categoria") {
+            return (
+              <CategoriaPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "banco") {
+            return (
+              <BancoPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "clientes") {
+            return (
+              <ClientesPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "servicos") {
+            return (
+              <ServicoPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "tipo-pagamento") {
+            return (
+              <TipoPagamentoPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "fornecedor") {
+            return (
+              <FornecedorPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "conta-pagar") {
+            return (
+              <ContaPagarPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "conta-receber") {
+            return (
+              <ContaReceberPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "caixa") {
+            return (
+              <CaixaPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === "vistoria") {
+            return (
+              <VistoriaPage
+                permissoes={permissoes}
+                administrador={administradorLogado()}
+                navegarPara={navegarPara}
+                voltarInicio={irParaInicio}
+              />
+            );
+          }
+          if (rota === null) {
+            return podeVerInicio ? (
+              <Inicio />
+            ) : (
+              <div>
+                <h2>Bem-vindo(a), {nomeUsuarioLogado()}!</h2>
+              </div>
+            );
+          }
+          return <Placeholder titulo={titulo} />;
+        }}
+      </AppShell>
+    </>
   );
 }
 

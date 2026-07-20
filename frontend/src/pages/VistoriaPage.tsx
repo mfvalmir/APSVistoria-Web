@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Banknote,
   Undo2,
+  Eye,
 } from "lucide-react";
 import { listarVistorias, excluirVistoria, obterVistoria, Vistoria, STATUS_VISTORIA } from "../api/vistoria";
 import { ParcelaContaReceber } from "../api/contaReceber";
@@ -20,14 +21,22 @@ import { ItemMenu } from "../api/menu";
 import VistoriaForm from "./VistoriaForm";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
+import { visualizarRecibo } from "../utils/recibo";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./ContaReceberForm.css";
+import "./VistoriaForm.css";
 import "./VistoriaPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "Código" },
@@ -76,6 +85,19 @@ function parcelaPaga(p: ParcelaContaReceber): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
+function classeVencimento(dataVencimento: string, paga: boolean): string {
+  if (paga) return "";
+  const venc = dataVencimento.slice(0, 10);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  if (venc < hojeStr) return "conta-receber-vencimento-vencida";
+  if (venc === hojeStr) return "conta-receber-vencimento-hoje";
+  return "";
+}
+
+function parcelaEstornada(p: ParcelaContaReceber): boolean {
+  return !!p.Observacao?.startsWith("[Estorno");
+}
+
 interface VistoriaPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -89,6 +111,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
   const podeExcluir = permissoes?.excluir ?? false;
   const podeBaixarParcela = permissoes?.baixarParCR ?? false;
   const podeEstornarParcela = permissoes?.estornarParCR ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -101,6 +124,10 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("vistoria", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("vistoria"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const [parcelasPorVistoria, setParcelasPorVistoria] = useState<Record<number, ParcelaContaReceber[]>>({});
@@ -115,6 +142,8 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
     idContaReceber: number;
     parcela: ParcelaContaReceber;
   } | null>(null);
+  const [gerandoRecibo, setGerandoRecibo] = useState<number | null>(null);
+  const [gerandoReciboAVista, setGerandoReciboAVista] = useState<number | null>(null);
 
   async function alternarExpandir(idVistoria: number) {
     const estavaExpandido = expandidos.has(idVistoria);
@@ -168,6 +197,58 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
     await atualizarVistoriaLinha(idVistoria);
   }
 
+  async function emitirRecibo(v: Vistoria, p: ParcelaContaReceber) {
+    setGerandoRecibo(p.IdContaReceberParcela);
+    try {
+      const parcelasDaVistoria = parcelasPorVistoria[v.idVistoria] || [];
+      await visualizarRecibo({
+        numeroRecibo: `${v.idVistoria}-${pad3(p.NumeroParcela)}`,
+        nomePagador: v.NomeCliente?.trim() || "Cliente não identificado",
+        documentoPagador: v.CpfCnpj || null,
+        valor: p.ValorPago || p.ValorParcela,
+        dataPagamento: p.DataPagamento || new Date().toISOString(),
+        formaPagamento: p.DescricaoTipoPagamento || "-",
+        referente: `à parcela nº ${pad3(p.NumeroParcela)}/${pad3(parcelasDaVistoria.length)} da Vistoria nº ${
+          v.idVistoria
+        } - Veículo placa ${v.PlacaVeiculo} - Serviço: ${v.DescricaoServico || "-"}`,
+        observacao: p.Observacao,
+      });
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } finally {
+      setGerandoRecibo(null);
+    }
+  }
+
+  // A 1ª parcela de uma Vistoria à vista nunca vira uma linha em ContaReceberParcela - a
+  // procedure Manter_Vistoria trata esse pagamento só via CaixaMovimento, ligado direto na
+  // Vistoria. Por isso o recibo é montado a partir do próprio cabeçalho (já disponível em `v`,
+  // sem precisar buscar nada), não de uma parcela da tabela expandida.
+  async function verReciboAVista(v: Vistoria) {
+    setGerandoReciboAVista(v.idVistoria);
+    try {
+      // Com mais de 1 parcela, o que nasce pago é só a entrada - o restante segue em aberto nas
+      // parcelas seguintes. Com 1 parcela só, o pagamento é o valor à vista, total mesmo.
+      const tipoPagamento = v.TotalParcelas > 1 ? "da entrada" : "à vista";
+      await visualizarRecibo({
+        numeroRecibo: `${v.idVistoria}-001`,
+        nomePagador: v.NomeCliente?.trim() || "Cliente não identificado",
+        documentoPagador: v.CpfCnpj || null,
+        valor: v.ValorTotalServico - (v.SaldoDevedor ?? 0),
+        dataPagamento: v.DataEmissao,
+        formaPagamento: v.DescricaoTipoPagamento || "-",
+        referente: `ao pagamento ${tipoPagamento} da Vistoria nº ${v.idVistoria} - Veículo placa ${
+          v.PlacaVeiculo
+        } - Serviço: ${v.DescricaoServico || "-"}`,
+        observacao: v.Observacao,
+      });
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } finally {
+      setGerandoReciboAVista(null);
+    }
+  }
+
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
       const novo = new Set(atual);
@@ -176,6 +257,12 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
       salvarColunasVisiveis("vistoria", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("vistoria", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -200,19 +287,21 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
 
   async function handleExcluir(vistoria: Vistoria) {
     if (
-      !window.confirm(
-        `Excluir definitivamente a vistoria da placa "${vistoria.PlacaVeiculo}"? Isso não remove eventuais contas a receber/parcelas já geradas.`
-      )
+      !(await confirmar({
+        mensagem: `Excluir definitivamente a vistoria da placa "${vistoria.PlacaVeiculo}"? Isso não remove eventuais contas a receber/parcelas já geradas.`,
+        perigo: true,
+      }))
     )
       return;
     try {
       await excluirVistoria(vistoria.idVistoria);
       carregar();
+      mostrarToast("Vistoria excluída com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir a vistoria");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir a vistoria", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -243,9 +332,39 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
     );
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(vistorias.length / ITENS_POR_PAGINA));
+  const vistoriasOrdenadas = ordenarLista(vistorias, ordenacao, {
+    id: (v) => v.idVistoria,
+    emissao: (v) => v.DataEmissao,
+    placa: (v) => v.PlacaVeiculo,
+    cliente: (v) => v.NomeCliente || "",
+    cpfCnpj: (v) => v.CpfCnpj || "",
+    responsavel: (v) => v.NomeResponsavel || "",
+    vistoriador: (v) => v.NomeVistoriador || "",
+    servico: (v) => v.DescricaoServico || "",
+    total: (v) => v.ValorTotalServico,
+    tipoPagamento: (v) => v.DescricaoTipoPagamento || "",
+    status: (v) => v.idStatusVistoria,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Vistoria>(COLUNAS, colunasVisiveis, {
+    id: (v) => String(v.idVistoria),
+    emissao: (v) => formatarData(v.DataEmissao),
+    placa: (v) => v.PlacaVeiculo,
+    cliente: (v) => v.NomeCliente || "-",
+    cpfCnpj: (v) => v.CpfCnpj || "-",
+    responsavel: (v) => v.NomeResponsavel || "-",
+    vistoriador: (v) => v.NomeVistoriador || "-",
+    servico: (v) => v.DescricaoServico || "-",
+    total: (v) => formatarValor(v.ValorTotalServico),
+    tipoPagamento: (v) => v.DescricaoTipoPagamento || "-",
+    status: (v) => statusInfo(v.idStatusVistoria).label.toUpperCase(),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(vistoriasOrdenadas.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const vistoriasPagina = vistorias.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const vistoriasPagina = vistoriasOrdenadas.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="vistoria-page">
@@ -254,6 +373,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
           type="button"
           className="vistoria-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -269,7 +389,13 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
             onChange={(e) => setBusca(e.target.value)}
           />
           {busca && (
-            <button type="button" className="vistoria-busca-limpar" title="Limpar busca" onClick={() => setBusca("")}>
+            <button
+              type="button"
+              className="vistoria-busca-limpar"
+              title="Limpar busca"
+              aria-label="Limpar busca"
+              onClick={() => setBusca("")}
+            >
               <X size={14} />
             </button>
           )}
@@ -290,6 +416,15 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
 
         <div className="vistoria-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="vistorias"
+            titulo="Vistorias"
+            dados={vistoriasOrdenadas}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="vistoria-btn-criar" onClick={abrirCriacao}>
             Lançar Vistoria
@@ -297,27 +432,81 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
         )}
       </div>
 
-      <div className="vistoria-tabela-wrapper">
+      <div className={`vistoria-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="vistoria-tabela">
           <thead>
             <tr>
               <th className="vistoria-col-expandir"></th>
-              {colunasVisiveis.has("id") && <th>Código</th>}
-              {colunasVisiveis.has("emissao") && <th>Emissão</th>}
-              {colunasVisiveis.has("placa") && <th>Placa</th>}
-              {colunasVisiveis.has("cliente") && <th>Cliente</th>}
-              {colunasVisiveis.has("cpfCnpj") && <th>Cpf/Cnpj</th>}
-              {colunasVisiveis.has("responsavel") && <th>Responsável</th>}
-              {colunasVisiveis.has("vistoriador") && <th>Vistoriador</th>}
-              {colunasVisiveis.has("servico") && <th>Serviço</th>}
-              {colunasVisiveis.has("total") && <th className="vistoria-col-valor">Total</th>}
-              {colunasVisiveis.has("tipoPagamento") && <th>Tipo Pgto.</th>}
-              {colunasVisiveis.has("status") && <th className="vistoria-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Código
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("emissao") && (
+                <ThOrdenavel campo="emissao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Emissão
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("placa") && (
+                <ThOrdenavel campo="placa" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Placa
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("cliente") && (
+                <ThOrdenavel campo="cliente" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Cliente
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("cpfCnpj") && (
+                <ThOrdenavel campo="cpfCnpj" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Cpf/Cnpj
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("responsavel") && (
+                <ThOrdenavel campo="responsavel" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Responsável
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("vistoriador") && (
+                <ThOrdenavel campo="vistoriador" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Vistoriador
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("servico") && (
+                <ThOrdenavel campo="servico" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Serviço
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("total") && (
+                <ThOrdenavel
+                  campo="total"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="vistoria-col-valor"
+                >
+                  Total
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("tipoPagamento") && (
+                <ThOrdenavel campo="tipoPagamento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Tipo Pgto.
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="vistoria-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="vistoria-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && vistoriasPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 2} className="vistoria-vazio">
                   Carregando...
@@ -342,6 +531,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                           type="button"
                           className={`vistoria-btn-expandir ${expandido ? "aberto" : ""}`}
                           title={expandido ? "Ocultar parcelas" : "Ver parcelas"}
+                          aria-label={expandido ? "Ocultar parcelas" : "Ver parcelas"}
                           onClick={() => alternarExpandir(v.idVistoria)}
                         >
                           <ChevronDown size={16} />
@@ -369,6 +559,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                           <button
                             className="vistoria-icone-acao editar"
                             title="Editar"
+                            aria-label="Editar"
                             onClick={() => abrirEdicao(v.idVistoria)}
                           >
                             <Pencil size={16} />
@@ -378,6 +569,11 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                           <button
                             className="vistoria-icone-acao perigo"
                             title={
+                              v.idStatusVistoria === 1 || v.idStatusVistoria === 2
+                                ? "Não é possível excluir: vistoria já paga ou parcial (regra do banco de dados)"
+                                : "Excluir"
+                            }
+                            aria-label={
                               v.idStatusVistoria === 1 || v.idStatusVistoria === 2
                                 ? "Não é possível excluir: vistoria já paga ou parcial (regra do banco de dados)"
                                 : "Excluir"
@@ -393,23 +589,43 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                     {expandido && (
                       <tr className="vistoria-linha-expandida">
                         <td colSpan={colunasVisiveis.size + 2} className="vistoria-parcelas-celula">
+                          {(v.idStatusVistoria === 1 || v.idStatusVistoria === 2) && (
+                            <div className="vistoria-form-avista">
+                              <p>
+                                A 1ª parcela nasceu paga (pagamento à vista lançado direto no caixa) - por isso
+                                não aparece na tabela de parcelas abaixo.
+                              </p>
+                              <button
+                                type="button"
+                                className="vistoria-form-btn-recibo-avista"
+                                disabled={gerandoReciboAVista === v.idVistoria}
+                                onClick={() => verReciboAVista(v)}
+                              >
+                                <Eye size={16} />
+                                Visualizar recibo
+                              </button>
+                            </div>
+                          )}
                           {carregandoParcelas.has(v.idVistoria) ? (
                             <div className="vistoria-parcelas-estado">Carregando parcelas...</div>
                           ) : !parcelas || parcelas.length === 0 ? (
-                            <div className="vistoria-parcelas-estado">Nenhuma parcela nesta vistoria.</div>
+                            (v.idStatusVistoria !== 1 && v.idStatusVistoria !== 2) && (
+                              <div className="vistoria-parcelas-estado">Nenhuma parcela nesta vistoria.</div>
+                            )
                           ) : (
                             <div className="conta-receber-form-parcelas-tabela-wrapper">
                               <table className="conta-receber-form-parcelas-tabela">
                                 <thead>
                                   <tr>
                                     <th>Nº</th>
+                                    <th>Cód. Parcela</th>
                                     <th>Vencimento</th>
                                     <th className="conta-receber-col-valor">Valor</th>
                                     <th className="conta-receber-col-valor">Pago</th>
                                     <th>Data Pagamento</th>
                                     <th>Tipo Pagamento</th>
                                     <th>Status</th>
-                                    {(podeBaixarParcela || podeEstornarParcela) && (
+                                    {(podeBaixarParcela || podeEstornarParcela || parcelas.some(parcelaPaga)) && (
                                       <th className="conta-receber-col-acoes">Ações</th>
                                     )}
                                   </tr>
@@ -421,7 +637,10 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                                     return (
                                       <tr key={p.IdContaReceberParcela}>
                                         <td>{pad3(p.NumeroParcela)}</td>
-                                        <td>{formatarData(p.DataVencimento)}</td>
+                                        <td>{p.IdContaReceberParcela}</td>
+                                        <td className={classeVencimento(p.DataVencimento, paga)}>
+                                          {formatarData(p.DataVencimento)}
+                                        </td>
                                         <td className="conta-receber-col-valor">{formatarValor(p.ValorParcela)}</td>
                                         <td className="conta-receber-col-valor">{formatarValor(p.ValorPago)}</td>
                                         <td>{p.DataPagamento ? formatarData(p.DataPagamento) : "-"}</td>
@@ -430,14 +649,18 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                                           <span className={`conta-receber-badge ${infoParcela.classe}`}>
                                             {infoParcela.label.toUpperCase()}
                                           </span>
+                                          {parcelaEstornada(p) && (
+                                            <span className="conta-receber-badge-estornada" title="Parcela estornada" />
+                                          )}
                                         </td>
-                                        {(podeBaixarParcela || podeEstornarParcela) && (
+                                        {(podeBaixarParcela || podeEstornarParcela || parcelas.some(parcelaPaga)) && (
                                           <td className="conta-receber-col-acoes">
                                             {podeBaixarParcela && !paga && v.idContaReceber && (
                                               <button
                                                 type="button"
                                                 className="conta-receber-icone-acao"
                                                 title="Dar baixa nesta parcela"
+                                                aria-label="Dar baixa nesta parcela"
                                                 onClick={() =>
                                                   setParcelaEmBaixa({
                                                     idVistoria: v.idVistoria,
@@ -454,6 +677,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                                                 type="button"
                                                 className="conta-receber-icone-acao estorno"
                                                 title="Estornar a baixa desta parcela"
+                                                aria-label="Estornar a baixa desta parcela"
                                                 onClick={() =>
                                                   setParcelaEmEstorno({
                                                     idVistoria: v.idVistoria,
@@ -463,6 +687,18 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
                                                 }
                                               >
                                                 <Undo2 size={16} />
+                                              </button>
+                                            )}
+                                            {paga && (
+                                              <button
+                                                type="button"
+                                                className="conta-receber-icone-acao"
+                                                title="Visualizar recibo"
+                                                aria-label="Visualizar recibo"
+                                                disabled={gerandoRecibo === p.IdContaReceberParcela}
+                                                onClick={() => emitirRecibo(v, p)}
+                                              >
+                                                <Eye size={16} />
                                               </button>
                                             )}
                                           </td>
@@ -487,6 +723,7 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
 
       <div className="vistoria-rodape">
         <span>{vistorias.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="vistoria-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

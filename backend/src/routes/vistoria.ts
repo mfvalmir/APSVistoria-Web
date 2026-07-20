@@ -60,6 +60,7 @@ interface ParametrosManterVistoria {
   idStatusVistoria?: number | null;
   saldoDevedor?: number | null;
   observacao?: string | null;
+  login?: string | null;
 }
 
 // Chama a stored procedure legada Manter_Vistoria (INSERT/UPDATE/DELETE transacional do
@@ -96,7 +97,8 @@ async function chamarManterVistoria(
     .input("idUsuarioEmissao", sql.Int, params.idUsuarioEmissao ?? null)
     .input("idUsuarioAlteracao", sql.Int, params.idUsuarioAlteracao ?? null)
     .input("idStatusVistoria", sql.Int, params.idStatusVistoria ?? null)
-    .input("Observacao", sql.VarChar(sql.MAX), params.observacao ?? null);
+    .input("Observacao", sql.VarChar(sql.MAX), params.observacao ?? null)
+    .input("Login", sql.VarChar(50), params.login ?? null);
 
   const result = await request.execute("Manter_Vistoria");
   return result.recordset?.[0]?.IDNovo;
@@ -174,12 +176,14 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
     observacao,
   } = req.body;
 
-  if (!dataEmissao || !placaVeiculo || !idCliente || !idServico || !valorTotalServico) {
+  // valorTotalServico pode ser 0 (vistoria de cortesia/retorno, que não gera cobrança) - por
+  // isso o obrigatório aqui é o campo ter sido informado, não ser "truthy".
+  if (!dataEmissao || !placaVeiculo || !idCliente || !idServico || valorTotalServico == null) {
     return res
       .status(400)
       .json({ erro: "dataEmissao, placaVeiculo, idCliente, idServico e valorTotalServico são obrigatórios" });
   }
-  if (valorTotalServico <= 0) return res.status(400).json({ erro: "valorTotalServico deve ser maior que zero" });
+  if (valorTotalServico < 0) return res.status(400).json({ erro: "valorTotalServico não pode ser negativo" });
   if (totalParcelas !== undefined && totalParcelas < 1) {
     return res.status(400).json({ erro: "totalParcelas deve ser maior que zero" });
   }
@@ -203,6 +207,7 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
       idPrimeiroTipoPagamento: idPrimeiroTipoPagamento || null,
       idUsuarioEmissao: req.user!.id,
       observacao: observacao || null,
+      login: req.user!.login,
     });
 
     res.status(201).json({ idVistoria });
@@ -233,12 +238,14 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
     observacao,
   } = req.body;
 
-  if (!dataEmissao || !placaVeiculo || !idCliente || !idServico || !valorTotalServico) {
+  // valorTotalServico pode ser 0 (vistoria de cortesia/retorno, que não gera cobrança) - por
+  // isso o obrigatório aqui é o campo ter sido informado, não ser "truthy".
+  if (!dataEmissao || !placaVeiculo || !idCliente || !idServico || valorTotalServico == null) {
     return res
       .status(400)
       .json({ erro: "dataEmissao, placaVeiculo, idCliente, idServico e valorTotalServico são obrigatórios" });
   }
-  if (valorTotalServico <= 0) return res.status(400).json({ erro: "valorTotalServico deve ser maior que zero" });
+  if (valorTotalServico < 0) return res.status(400).json({ erro: "valorTotalServico não pode ser negativo" });
 
   try {
     const pool = await getPool();

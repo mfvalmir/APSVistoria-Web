@@ -19,15 +19,22 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
 
-    if (novaSenha !== confirmarNovaSenha) {
-      setErro("As senhas não conferem");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!senhaAtual) novosErros.senhaAtual = "Informe a senha atual";
+    if (!novaSenha) novosErros.novaSenha = "Informe a nova senha";
+    if (novaSenha && confirmarNovaSenha && novaSenha !== confirmarNovaSenha) {
+      novosErros.confirmarNovaSenha = "As senhas não conferem";
+    } else if (novaSenha && !confirmarNovaSenha) {
+      novosErros.confirmarNovaSenha = "Confirme a nova senha";
     }
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     setSalvando(true);
     try {
@@ -53,9 +60,9 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
         <h2>Alterar Senha</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.senhaAtual ? "campo-invalido" : ""}`}>
             <label htmlFor="us-senha-atual">
               Senha atual <span className="obrigatorio">*</span>
             </label>
@@ -64,7 +71,10 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 id="us-senha-atual"
                 type={mostrarSenha ? "text" : "password"}
                 value={senhaAtual}
-                onChange={(e) => setSenhaAtual(e.target.value)}
+                onChange={(e) => {
+                  setSenhaAtual(e.target.value);
+                  if (erros.senhaAtual) setErros((atual) => ({ ...atual, senhaAtual: "" }));
+                }}
                 placeholder="Digite a senha atual"
                 required
               />
@@ -72,9 +82,10 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {erros.senhaAtual && <span className="usuario-form-campo-erro">{erros.senhaAtual}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.novaSenha ? "campo-invalido" : ""}`}>
             <label htmlFor="us-nova-senha">
               Nova senha <span className="obrigatorio">*</span>
             </label>
@@ -83,7 +94,10 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 id="us-nova-senha"
                 type={mostrarNovaSenha ? "text" : "password"}
                 value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
+                onChange={(e) => {
+                  setNovaSenha(e.target.value);
+                  if (erros.novaSenha) setErros((atual) => ({ ...atual, novaSenha: "" }));
+                }}
                 placeholder="Digite a nova senha"
                 required
               />
@@ -91,9 +105,10 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 {mostrarNovaSenha ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {erros.novaSenha && <span className="usuario-form-campo-erro">{erros.novaSenha}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.confirmarNovaSenha ? "campo-invalido" : ""}`}>
             <label htmlFor="us-confirmar-nova-senha">
               Confirmar nova senha <span className="obrigatorio">*</span>
             </label>
@@ -102,7 +117,10 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 id="us-confirmar-nova-senha"
                 type={mostrarNovaSenha ? "text" : "password"}
                 value={confirmarNovaSenha}
-                onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                onChange={(e) => {
+                  setConfirmarNovaSenha(e.target.value);
+                  if (erros.confirmarNovaSenha) setErros((atual) => ({ ...atual, confirmarNovaSenha: "" }));
+                }}
                 placeholder="Repita a nova senha"
                 required
               />
@@ -110,6 +128,7 @@ function UsuarioSenha({ id, onVoltar }: UsuarioSenhaProps) {
                 {mostrarNovaSenha ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {erros.confirmarNovaSenha && <span className="usuario-form-campo-erro">{erros.confirmarNovaSenha}</span>}
           </div>
         </div>
 

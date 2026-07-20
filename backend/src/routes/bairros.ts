@@ -63,16 +63,17 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // IDBairro não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricaoBairro", sql.VarChar, descricaoBairro)
       .input("idCidade", sql.Int, idCidade)
       .query(
         `INSERT INTO Bairro (IDBairro, DescricaoBairro, idCidade)
+         OUTPUT INSERTED.IDBairro
          VALUES ((SELECT ISNULL(MAX(IDBairro), 0) + 1 FROM Bairro), @descricaoBairro, @idCidade)`
       );
 
-    res.status(201).json({ mensagem: "Bairro criado" });
+    res.status(201).json({ IDBairro: result.recordset[0].IDBairro, mensagem: "Bairro criado" });
   } catch (err: any) {
     if (err?.number === 547) {
       return res.status(400).json({ erro: "Cidade selecionada não existe" });

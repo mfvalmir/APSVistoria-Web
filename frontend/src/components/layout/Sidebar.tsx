@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Folder, Home } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Folder, Home, Search, X } from "lucide-react";
 import { GrupoMenu } from "../../api/menu";
 import { buscarInfoSistema } from "../../api/sistema";
 import { getIcone } from "../iconRegistry";
@@ -13,9 +13,30 @@ interface SidebarProps {
   onIrParaInicio: () => void;
 }
 
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
 function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }: SidebarProps) {
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(() => new Set());
   const [banco, setBanco] = useState("");
+  const [busca, setBusca] = useState("");
+
+  const buscando = busca.trim().length > 0;
+
+  const gruposFiltrados = useMemo(() => {
+    if (!buscando) return grupos;
+    const termo = normalizar(busca.trim());
+    return grupos
+      .map((grupo) => ({
+        ...grupo,
+        itens: grupo.itens.filter((item) => normalizar(item.nome).includes(termo)),
+      }))
+      .filter((grupo) => grupo.itens.length > 0);
+  }, [grupos, busca, buscando]);
 
   useEffect(() => {
     buscarInfoSistema()
@@ -45,6 +66,26 @@ function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }
 
   return (
     <nav className={`app-sidebar ${aberto ? "" : "app-sidebar-collapsed"}`}>
+      <div className="app-sidebar-busca">
+        <Search size={14} />
+        <input
+          placeholder="Buscar no menu..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        {busca && (
+          <button
+            type="button"
+            className="app-sidebar-busca-limpar"
+            title="Limpar busca"
+            aria-label="Limpar busca"
+            onClick={() => setBusca("")}
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
       <ul className="app-sidebar-tree">
         <li className="app-sidebar-grupo">
           <button
@@ -57,8 +98,12 @@ function Sidebar({ grupos, rotaAtual, aberto, onSelecionarItem, onIrParaInicio }
           </button>
         </li>
 
-        {grupos.map((grupo) => {
-          const expandido = gruposExpandidos.has(grupo.grupo);
+        {buscando && gruposFiltrados.length === 0 && (
+          <li className="app-sidebar-busca-vazio">Nenhum item encontrado</li>
+        )}
+
+        {gruposFiltrados.map((grupo) => {
+          const expandido = buscando || gruposExpandidos.has(grupo.grupo);
           return (
             <li key={grupo.grupo} className="app-sidebar-grupo">
               <button

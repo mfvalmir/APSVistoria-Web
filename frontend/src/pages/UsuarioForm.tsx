@@ -4,6 +4,7 @@ import { ArrowLeft, Eye, EyeOff, KeyRound, Send } from "lucide-react";
 import { obterUsuario, criarUsuario, atualizarUsuario } from "../api/usuarios";
 import { buscarFuncionarios, FuncionarioResumo } from "../api/funcionarios";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { useToast } from "../contexts/ToastContext";
 import "./UsuarioForm.css";
 
 interface UsuarioFormProps {
@@ -31,6 +32,8 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
 
   useEffect(() => {
     if (!modoEdicao || id === null) return;
@@ -68,25 +71,25 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
     e.preventDefault();
     setErro("");
 
-    if (!modoEdicao && !idFuncionario) {
-      setErro("Selecione um funcionário na lista");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!login.trim()) novosErros.login = "Informe o nome de usuário";
+    if (!modoEdicao) {
+      if (!idFuncionario) novosErros.idFuncionario = "Selecione um funcionário na lista";
+      if (!senha) novosErros.senha = "Informe a senha";
+      if (senha && confirmarSenha && senha !== confirmarSenha) novosErros.confirmarSenha = "As senhas não conferem";
+      if (!confirmarSenha && senha) novosErros.confirmarSenha = "Confirme a senha";
     }
-    if (!modoEdicao && senha !== confirmarSenha) {
-      setErro("As senhas não conferem");
-      return;
-    }
-    if (!modoEdicao && !senha) {
-      setErro("Informe a senha");
-      return;
-    }
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0) return;
 
     setSalvando(true);
     try {
       if (modoEdicao && id !== null) {
         await atualizarUsuario(id, { login, status, administrador });
+        mostrarToast("Usuário atualizado com sucesso", "sucesso");
       } else {
         await criarUsuario({ idFuncionario: idFuncionario!, login, senha, administrador });
+        mostrarToast("Usuário criado com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -113,19 +116,23 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
         <h2>{modoEdicao ? "Editar Usuário" : "Novo Usuário"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.login ? "campo-invalido" : ""}`}>
             <label htmlFor="uf-login">
               Nome de usuário <span className="obrigatorio">*</span>
             </label>
             <input
               id="uf-login"
               value={login}
-              onChange={(e) => setLogin(e.target.value)}
+              onChange={(e) => {
+                setLogin(e.target.value);
+                if (erros.login) setErros((atual) => ({ ...atual, login: "" }));
+              }}
               placeholder="Digite o nome de usuário"
               required
             />
+            {erros.login && <span className="usuario-form-campo-erro">{erros.login}</span>}
           </div>
 
           <div className="usuario-form-campo usuario-form-campo-status">
@@ -139,7 +146,7 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
           </div>
         </div>
 
-        <div className="usuario-form-campo usuario-form-combobox">
+        <div className={`usuario-form-campo usuario-form-combobox ${erros.idFuncionario ? "campo-invalido" : ""}`}>
           <label htmlFor="uf-funcionario">Nome do Funcionário</label>
           <input
             id="uf-funcionario"
@@ -148,6 +155,7 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
               setNomeFuncionario(e.target.value);
               setIdFuncionario(null);
               setMostrarSugestoes(true);
+              if (erros.idFuncionario) setErros((atual) => ({ ...atual, idFuncionario: "" }));
             }}
             onFocus={() => setMostrarSugestoes(true)}
             onBlur={() => setTimeout(() => setMostrarSugestoes(false), 150)}
@@ -164,6 +172,7 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
               ))}
             </ul>
           )}
+          {erros.idFuncionario && <span className="usuario-form-campo-erro">{erros.idFuncionario}</span>}
         </div>
 
         {modoEdicao ? (
@@ -173,7 +182,7 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
           </button>
         ) : (
           <div className="usuario-form-linha">
-            <div className="usuario-form-campo">
+            <div className={`usuario-form-campo ${erros.senha ? "campo-invalido" : ""}`}>
               <label htmlFor="uf-senha">
                 Senha <span className="obrigatorio">*</span>
               </label>
@@ -182,7 +191,10 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
                   id="uf-senha"
                   type={mostrarSenha ? "text" : "password"}
                   value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
+                  onChange={(e) => {
+                    setSenha(e.target.value);
+                    if (erros.senha) setErros((atual) => ({ ...atual, senha: "" }));
+                  }}
                   placeholder="Digite a senha"
                   required
                 />
@@ -190,9 +202,10 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
                   {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {erros.senha && <span className="usuario-form-campo-erro">{erros.senha}</span>}
             </div>
 
-            <div className="usuario-form-campo">
+            <div className={`usuario-form-campo ${erros.confirmarSenha ? "campo-invalido" : ""}`}>
               <label htmlFor="uf-confirmar-senha">
                 Confirmar Senha <span className="obrigatorio">*</span>
               </label>
@@ -201,11 +214,15 @@ function UsuarioForm({ id, onVoltar, onAlterarSenha }: UsuarioFormProps) {
                   id="uf-confirmar-senha"
                   type={mostrarSenha ? "text" : "password"}
                   value={confirmarSenha}
-                  onChange={(e) => setConfirmarSenha(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmarSenha(e.target.value);
+                    if (erros.confirmarSenha) setErros((atual) => ({ ...atual, confirmarSenha: "" }));
+                  }}
                   placeholder="Repita a senha"
                   required
                 />
               </div>
+              {erros.confirmarSenha && <span className="usuario-form-campo-erro">{erros.confirmarSenha}</span>}
             </div>
           </div>
         )}

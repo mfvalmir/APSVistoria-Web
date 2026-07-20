@@ -27,13 +27,19 @@ import ContaPagarForm from "./ContaPagarForm";
 import ContaPagarBaixaModal from "./ContaPagarBaixaModal";
 import ContaPagarEstornoModal from "./ContaPagarEstornoModal";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./ContaPagarForm.css";
 import "./ContaPagarPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -78,6 +84,19 @@ function parcelaPaga(p: ParcelaContaPagar): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
+function classeVencimento(dataVencimento: string, paga: boolean): string {
+  if (paga) return "";
+  const venc = dataVencimento.slice(0, 10);
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (venc < hoje) return "conta-pagar-vencimento-vencida";
+  if (venc === hoje) return "conta-pagar-vencimento-hoje";
+  return "";
+}
+
+function parcelaEstornada(p: ParcelaContaPagar): boolean {
+  return !!p.Observacao?.startsWith("[Estorno");
+}
+
 interface ContaPagarPageProps {
   permissoes: ItemMenu["permissoes"] | null;
   administrador: boolean;
@@ -91,6 +110,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
   const podeExcluir = permissoes?.excluir ?? false;
   const podeBaixarParcela = permissoes?.baixarParCP ?? false;
   const podeEstornarParcela = permissoes?.estornarParCP ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -103,6 +123,10 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("conta-pagar", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("conta-pagar"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const [parcelasPorConta, setParcelasPorConta] = useState<Record<number, ParcelaContaPagar[]>>({});
@@ -147,7 +171,13 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
     setContas((atual) =>
       atual.map((c) =>
         c.idContaPagar === idContaPagar
-          ? { ...c, IdStatusContaPagar: dados.IdStatusContaPagar, SaldoDevedor: dados.SaldoDevedor }
+          ? {
+              ...c,
+              IdStatusContaPagar: dados.IdStatusContaPagar,
+              SaldoDevedor: dados.SaldoDevedor,
+              ParcelasVencidas: dados.ParcelasVencidas,
+              ParcelasVencendoHoje: dados.ParcelasVencendoHoje,
+            }
           : c
       )
     );
@@ -177,6 +207,12 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
     });
   }
 
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("conta-pagar", valor);
+    setPagina(1);
+  }
+
   async function carregar() {
     setCarregando(true);
     try {
@@ -199,19 +235,21 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
 
   async function handleExcluir(conta: ContaPagar) {
     if (
-      !window.confirm(
-        `Excluir definitivamente a conta "${conta.Descricao}"? Isso remove também todas as parcelas, mesmo as já pagas.`
-      )
+      !(await confirmar({
+        mensagem: `Excluir definitivamente a conta "${conta.Descricao}"? Isso remove também todas as parcelas ainda pendentes.`,
+        perigo: true,
+      }))
     )
       return;
     try {
       await excluirContaPagar(conta.idContaPagar);
       carregar();
+      mostrarToast("Conta a pagar excluída com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir a conta a pagar");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir a conta a pagar", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -242,9 +280,35 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
     );
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(contas.length / ITENS_POR_PAGINA));
+  const contasOrdenadas = ordenarLista(contas, ordenacao, {
+    id: (c) => c.idContaPagar,
+    numeroDocumento: (c) => c.NumeroDocumento || "",
+    descricao: (c) => c.Descricao,
+    fornecedor: (c) => c.RazaoSocial || "",
+    categoria: (c) => c.DescricaoCategoria,
+    valorTotal: (c) => c.ValorTotal,
+    saldoDevedor: (c) => c.SaldoDevedor,
+    dataEmissao: (c) => c.DataEmissao,
+    status: (c) => c.IdStatusContaPagar,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<ContaPagar>(COLUNAS, colunasVisiveis, {
+    id: (c) => String(c.idContaPagar),
+    numeroDocumento: (c) => c.NumeroDocumento || "-",
+    descricao: (c) => c.Descricao,
+    fornecedor: (c) => c.RazaoSocial || "-",
+    categoria: (c) => c.DescricaoCategoria,
+    valorTotal: (c) => formatarValor(c.ValorTotal),
+    saldoDevedor: (c) => formatarValor(c.SaldoDevedor),
+    dataEmissao: (c) => formatarData(c.DataEmissao),
+    status: (c) => statusInfo(c.IdStatusContaPagar).label.toUpperCase(),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(contasOrdenadas.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const contasPagina = contas.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const contasPagina = contasOrdenadas.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="conta-pagar-page">
@@ -253,6 +317,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
           type="button"
           className="conta-pagar-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -268,6 +333,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
               type="button"
               className="conta-pagar-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -290,32 +356,106 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
 
         <div className="conta-pagar-toolbar-espaco" />
 
-        {podeAdicionar && (
-          <button className="conta-pagar-btn-criar" onClick={abrirCriacao}>
-            Criar Conta a Pagar
-          </button>
-        )}
+        <div className="conta-pagar-toolbar-direita">
+          <div className="conta-pagar-legenda">
+            <span className="conta-pagar-legenda-item">
+              <span className="conta-pagar-legenda-cor vencida" /> parcela(s) vencida(s)
+            </span>
+            <span className="conta-pagar-legenda-item">
+              <span className="conta-pagar-legenda-cor vencendo-hoje" /> parcela vencendo hoje
+            </span>
+            <span className="conta-pagar-legenda-item">
+              <span className="conta-pagar-legenda-cor estornada" /> Parcela Estornada
+            </span>
+          </div>
+
+          {podeExportar && (
+            <BotaoExportar
+              nomeArquivo="contas-a-pagar"
+              titulo="Contas a Pagar"
+              dados={contasOrdenadas}
+              colunas={colunasExportacao}
+            />
+          )}
+
+          {podeAdicionar && (
+            <button className="conta-pagar-btn-criar" onClick={abrirCriacao}>
+              Criar Conta a Pagar
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="conta-pagar-tabela-wrapper">
+      <div className={`conta-pagar-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="conta-pagar-tabela">
           <thead>
             <tr>
               <th className="conta-pagar-col-expandir"></th>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("numeroDocumento") && <th>Documento</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
-              {colunasVisiveis.has("fornecedor") && <th>Fornecedor</th>}
-              {colunasVisiveis.has("categoria") && <th>Categoria</th>}
-              {colunasVisiveis.has("valorTotal") && <th className="conta-pagar-col-valor">Valor Total</th>}
-              {colunasVisiveis.has("saldoDevedor") && <th className="conta-pagar-col-valor">Saldo Devedor</th>}
-              {colunasVisiveis.has("dataEmissao") && <th>Emissão</th>}
-              {colunasVisiveis.has("status") && <th className="conta-pagar-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("numeroDocumento") && (
+                <ThOrdenavel campo="numeroDocumento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Documento
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("fornecedor") && (
+                <ThOrdenavel campo="fornecedor" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Fornecedor
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("categoria") && (
+                <ThOrdenavel campo="categoria" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Categoria
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("valorTotal") && (
+                <ThOrdenavel
+                  campo="valorTotal"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="conta-pagar-col-valor"
+                >
+                  Valor Total
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("saldoDevedor") && (
+                <ThOrdenavel
+                  campo="saldoDevedor"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="conta-pagar-col-valor"
+                >
+                  Saldo Devedor
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("dataEmissao") && (
+                <ThOrdenavel campo="dataEmissao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Emissão
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="conta-pagar-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="conta-pagar-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && contasPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 2} className="conta-pagar-vazio">Carregando...</td>
               </tr>
@@ -338,6 +478,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                         type="button"
                         className={`conta-pagar-btn-expandir ${expandido ? "aberto" : ""}`}
                         title={expandido ? "Ocultar parcelas" : "Ver parcelas"}
+                        aria-label={expandido ? "Ocultar parcelas" : "Ver parcelas"}
                         onClick={() => alternarExpandir(c.idContaPagar)}
                       >
                         <ChevronDown size={16} />
@@ -358,6 +499,18 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                     {colunasVisiveis.has("status") && (
                       <td className="conta-pagar-col-status">
                         <span className={`conta-pagar-badge ${classe}`}>{label.toUpperCase()}</span>
+                        {c.ParcelasVencidas > 0 && (
+                          <span
+                            className="conta-pagar-badge-vencidas"
+                            title={`${c.ParcelasVencidas} parcela(s) vencida(s)`}
+                          />
+                        )}
+                        {c.ParcelasVencendoHoje > 0 && (
+                          <span
+                            className="conta-pagar-badge-vencendo-hoje"
+                            title="Parcela vencendo hoje"
+                          />
+                        )}
                       </td>
                     )}
                     <td className="conta-pagar-col-acoes">
@@ -365,6 +518,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                         <button
                           className="conta-pagar-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(c.idContaPagar)}
                         >
                           <Pencil size={16} />
@@ -373,7 +527,17 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                       {podeExcluir && (
                         <button
                           className="conta-pagar-icone-acao perigo"
-                          title="Excluir"
+                          title={
+                            c.IdStatusContaPagar === 1 || c.IdStatusContaPagar === 2
+                              ? "Não é possível excluir: existe parcela já paga ou baixada nesta conta"
+                              : "Excluir"
+                          }
+                          aria-label={
+                            c.IdStatusContaPagar === 1 || c.IdStatusContaPagar === 2
+                              ? "Não é possível excluir: existe parcela já paga ou baixada nesta conta"
+                              : "Excluir"
+                          }
+                          disabled={c.IdStatusContaPagar === 1 || c.IdStatusContaPagar === 2}
                           onClick={() => handleExcluir(c)}
                         >
                           <Trash2 size={16} />
@@ -394,6 +558,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                               <thead>
                                 <tr>
                                   <th>Nº</th>
+                                  <th>Cód. Parcela</th>
                                   <th>Vencimento</th>
                                   <th className="conta-pagar-col-valor">Valor</th>
                                   <th className="conta-pagar-col-valor">Pago</th>
@@ -412,7 +577,10 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                                   return (
                                     <tr key={p.IdContaPagarParcela}>
                                       <td>{pad3(p.NumeroParcela)}</td>
-                                      <td>{formatarData(p.DataVencimento)}</td>
+                                      <td>{p.IdContaPagarParcela}</td>
+                                      <td className={classeVencimento(p.DataVencimento, paga)}>
+                                        {formatarData(p.DataVencimento)}
+                                      </td>
                                       <td className="conta-pagar-col-valor">{formatarValor(p.ValorParcela)}</td>
                                       <td className="conta-pagar-col-valor">{formatarValor(p.ValorPago)}</td>
                                       <td>{p.DataPagamento ? formatarData(p.DataPagamento) : "-"}</td>
@@ -421,6 +589,9 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                                         <span className={`conta-pagar-badge ${infoParcela.classe}`}>
                                           {infoParcela.label.toUpperCase()}
                                         </span>
+                                        {parcelaEstornada(p) && (
+                                          <span className="conta-pagar-badge-estornada" title="Parcela estornada" />
+                                        )}
                                       </td>
                                       {(podeBaixarParcela || podeEstornarParcela) && (
                                         <td className="conta-pagar-col-acoes">
@@ -429,6 +600,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                                               type="button"
                                               className="conta-pagar-icone-acao"
                                               title="Dar baixa nesta parcela"
+                                              aria-label="Dar baixa nesta parcela"
                                               onClick={() =>
                                                 setParcelaEmBaixa({ idContaPagar: c.idContaPagar, parcela: p })
                                               }
@@ -441,6 +613,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
                                               type="button"
                                               className="conta-pagar-icone-acao estorno"
                                               title="Estornar a baixa desta parcela"
+                                              aria-label="Estornar a baixa desta parcela"
                                               onClick={() =>
                                                 setParcelaEmEstorno({ idContaPagar: c.idContaPagar, parcela: p })
                                               }
@@ -470,6 +643,7 @@ function ContaPagarPage({ permissoes, navegarPara, voltarInicio }: ContaPagarPag
 
       <div className="conta-pagar-rodape">
         <span>{contas.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="conta-pagar-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

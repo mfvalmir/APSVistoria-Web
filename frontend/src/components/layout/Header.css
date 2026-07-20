@@ -118,3 +118,17 @@
 .app-header-logout:hover {
   background-color: rgba(255, 255, 255, 0.22);
 }
+
+@media (max-width: 768px) {
+  .app-header-versao,
+  .app-header-grupo {
+    display: none;
+  }
+
+  .app-header-usuario {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

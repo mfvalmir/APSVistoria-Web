@@ -1,0 +1,57 @@
+.servico-modal-form {
+  border: none;
+  padding: 0;
+  gap: 16px;
+}
+
+.servico-modal-campo-valor {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+.servico-modal-acoes {
+  display: flex;
+  gap: 12px;
+}
+
+.servico-modal-btn-salvar,
+.servico-modal-btn-cancelar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.servico-modal-btn-salvar {
+  background: #2f9e46;
+  color: #f2ede8;
+}
+
+.servico-modal-btn-salvar:hover:not(:disabled) {
+  background: #278238;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.servico-modal-btn-cancelar {
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+.servico-modal-btn-cancelar:hover:not(:disabled) {
+  background: var(--cor-fundo-hover);
+}
+
+.servico-modal-btn-salvar:disabled,
+.servico-modal-btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

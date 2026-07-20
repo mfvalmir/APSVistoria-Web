@@ -48,6 +48,7 @@ router.get("/", authMiddleware, async (_req, res) => {
       proximosVencimentosResult,
       fluxoCaixaResult,
       vistoriasPorMesResult,
+      tiposPagamentoResult,
     ] = await Promise.all([
       pool
         .request()
@@ -124,6 +125,16 @@ router.get("/", authMiddleware, async (_req, res) => {
            WHERE DataEmissao >= DATEADD(MONTH, -5, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
            GROUP BY YEAR(DataEmissao), MONTH(DataEmissao)`
         ),
+      pool
+        .request()
+        .query(
+          `SELECT tp.TipoPagamento AS tipo, COUNT(*) AS quantidade, SUM(m.Valor) AS valor
+           FROM CaixaMovimento m
+           JOIN TipoPagamento tp ON tp.idTipoPagamento = m.idFormaPagamento
+           WHERE YEAR(m.DataHora) = YEAR(GETDATE()) AND MONTH(m.DataHora) = MONTH(GETDATE())
+           GROUP BY tp.TipoPagamento
+           ORDER BY SUM(m.Valor) DESC`
+        ),
     ]);
 
     const caixa = caixaResult.recordset[0];
@@ -193,6 +204,11 @@ router.get("/", authMiddleware, async (_req, res) => {
       },
       fluxoCaixa,
       vistoriasPorMes,
+      tiposPagamento: tiposPagamentoResult.recordset.map((r) => ({
+        tipo: r.tipo,
+        quantidade: r.quantidade,
+        valor: Number(r.valor),
+      })),
     });
   } catch (err) {
     console.error(err);

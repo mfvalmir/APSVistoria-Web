@@ -103,6 +103,46 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+.conta-receber-toolbar-direita {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.conta-receber-legenda {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.conta-receber-legenda-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cor-texto-fraco);
+}
+
+.conta-receber-legenda-cor {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.conta-receber-legenda-cor.vencida {
+  background: var(--cor-erro);
+}
+
+.conta-receber-legenda-cor.vencendo-hoje {
+  background: #2f9e46;
+}
+
+.conta-receber-legenda-cor.estornada {
+  background: #8a63d2;
+}
+
 .conta-receber-tabela-wrapper {
   overflow-x: auto;
   border: 1px solid var(--cor-borda);
@@ -192,6 +232,26 @@
   color: var(--cor-erro);
 }
 
+.conta-receber-badge-vencidas {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--cor-erro);
+  vertical-align: middle;
+}
+
+.conta-receber-badge-vencendo-hoje {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #2f9e46;
+  vertical-align: middle;
+}
+
 .conta-receber-col-expandir {
   width: 1%;
   text-align: center;
@@ -224,8 +284,12 @@
 }
 
 .conta-receber-linha-expandida td {
-  background: var(--cor-fundo-secundario);
+  background: #e4edf7;
   padding: 14px 16px !important;
+}
+
+:root[data-theme="dark"] .conta-receber-linha-expandida td {
+  background: #23282f;
 }
 
 .conta-receber-tabela tbody tr.conta-receber-linha-pai-expandida td {
@@ -261,6 +325,8 @@
 
 .conta-receber-col-status {
   text-align: center;
+  white-space: nowrap;
+  min-width: 160px;
 }
 
 .conta-receber-col-acoes {
@@ -290,6 +356,15 @@
 
 .conta-receber-icone-acao:hover {
   background: var(--cor-fundo-hover);
+}
+
+.conta-receber-icone-acao:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.conta-receber-icone-acao:disabled:hover {
+  background: var(--cor-fundo);
 }
 
 .conta-receber-icone-acao.editar {

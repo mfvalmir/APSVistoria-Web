@@ -95,8 +95,9 @@ export async function obterFuncionario(id: number): Promise<Funcionario> {
   return data;
 }
 
-export async function criarFuncionario(dados: DadosFuncionario): Promise<void> {
-  await api.post("/funcionarios", dados);
+export async function criarFuncionario(dados: DadosFuncionario): Promise<{ idFuncionario: number }> {
+  const { data } = await api.post<{ idFuncionario: number }>("/funcionarios", dados);
+  return data;
 }
 
 export async function atualizarFuncionario(id: number, dados: EdicaoFuncionario): Promise<void> {

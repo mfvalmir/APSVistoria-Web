@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarFornecedores, desativarFornecedor, Fornecedor } from "../api/fornecedores";
 import { ItemMenu } from "../api/menu";
 import FornecedorForm from "./FornecedorForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./FornecedorPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -44,6 +51,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -56,6 +64,10 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("fornecedores", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("fornecedores"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -65,6 +77,12 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
       salvarColunasVisiveis("fornecedores", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("fornecedores", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -88,9 +106,19 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
   }, [busca, status, subView]);
 
   async function handleExcluir(fornecedor: Fornecedor) {
-    if (!window.confirm(`Desativar o fornecedor "${fornecedor.RazaoSocial}"?`)) return;
-    await desativarFornecedor(fornecedor.idFornecedor);
-    carregar();
+    if (!(await confirmar({ mensagem: `Desativar o fornecedor "${fornecedor.RazaoSocial}"?`, perigo: true })))
+      return;
+    try {
+      await desativarFornecedor(fornecedor.idFornecedor);
+      carregar();
+      mostrarToast("Fornecedor desativado com sucesso", "sucesso");
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        mostrarToast(err.response.data?.erro || "Não foi possível desativar o fornecedor", "erro");
+      } else {
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
+      }
+    }
   }
 
   function abrirCriacao() {
@@ -112,11 +140,28 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
     return <FornecedorForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(fornecedores.length / ITENS_POR_PAGINA));
+  const fornecedoresOrdenados = ordenarLista(fornecedores, ordenacao, {
+    id: (f) => f.idFornecedor,
+    razaoSocial: (f) => f.RazaoSocial,
+    nomeFantasia: (f) => f.NomeFantasia || "",
+    documento: (f) => f.CpfCnpj || "",
+    telefone: (f) => f.Telefone || "",
+    status: (f) => f.Ativo.trim(),
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Fornecedor>(COLUNAS, colunasVisiveis, {
+    id: (f) => String(f.idFornecedor),
+    razaoSocial: (f) => f.RazaoSocial,
+    nomeFantasia: (f) => f.NomeFantasia || "-",
+    documento: (f) => (f.CpfCnpj ? formatarCpfCnpjExibicao(f.CpfCnpj) : "-"),
+    telefone: (f) => f.Telefone || "-",
+    status: (f) => (f.Ativo.trim() === "A" ? "ATIVO" : "INATIVO"),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(fornecedoresOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const fornecedoresPagina = fornecedores.slice(
-    (paginaAtual - 1) * ITENS_POR_PAGINA,
-    paginaAtual * ITENS_POR_PAGINA
+  const fornecedoresPagina = fornecedoresOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
   );
 
   return (
@@ -126,6 +171,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
           type="button"
           className="fornecedores-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -141,6 +187,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
               type="button"
               className="fornecedores-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -160,6 +207,15 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
 
         <div className="fornecedores-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="fornecedores"
+            titulo="Fornecedores"
+            dados={fornecedoresOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="fornecedores-btn-criar" onClick={abrirCriacao}>
             Criar Fornecedor
@@ -167,21 +223,50 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
         )}
       </div>
 
-      <div className="fornecedores-tabela-wrapper">
+      <div className={`fornecedores-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="fornecedores-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("razaoSocial") && <th>Razão Social</th>}
-              {colunasVisiveis.has("nomeFantasia") && <th>Nome Fantasia</th>}
-              {colunasVisiveis.has("documento") && <th>CPF/CNPJ</th>}
-              {colunasVisiveis.has("telefone") && <th>Telefone</th>}
-              {colunasVisiveis.has("status") && <th className="fornecedores-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("razaoSocial") && (
+                <ThOrdenavel campo="razaoSocial" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Razão Social
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("nomeFantasia") && (
+                <ThOrdenavel campo="nomeFantasia" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Nome Fantasia
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("documento") && (
+                <ThOrdenavel campo="documento" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  CPF/CNPJ
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("telefone") && (
+                <ThOrdenavel campo="telefone" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Telefone
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="fornecedores-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="fornecedores-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && fornecedoresPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="fornecedores-vazio">Carregando...</td>
               </tr>
@@ -213,6 +298,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
                         <button
                           className="fornecedores-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(f.idFornecedor)}
                         >
                           <Pencil size={16} />
@@ -222,6 +308,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
                         <button
                           className="fornecedores-icone-acao perigo"
                           title="Desativar"
+                          aria-label="Desativar"
                           onClick={() => handleExcluir(f)}
                         >
                           <Trash2 size={16} />
@@ -238,6 +325,7 @@ function FornecedorPage({ permissoes, voltarInicio }: FornecedorPageProps) {
 
       <div className="fornecedores-rodape">
         <span>{fornecedores.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="fornecedores-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

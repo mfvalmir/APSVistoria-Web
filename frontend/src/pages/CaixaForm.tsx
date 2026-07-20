@@ -5,6 +5,7 @@ import { obterCaixa, abrirCaixa, atualizarCaixa, listarCaixas, MovimentoCaixa, O
 import { focarProximoCampoAoEnter } from "../utils/form";
 import { ItemMenu } from "../api/menu";
 import { decodeToken } from "../utils/jwt";
+import { useToast } from "../contexts/ToastContext";
 import CaixaFecharModal from "./CaixaFecharModal";
 import "./UsuarioForm.css";
 import "./CaixaForm.css";
@@ -83,6 +84,7 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [mostrarFechar, setMostrarFechar] = useState(false);
+  const { mostrarToast } = useToast();
 
   const aberto = !dataFechamento;
   const podeEditar = permissoes?.editar ?? false;
@@ -141,6 +143,7 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
   async function handleFechado() {
     setMostrarFechar(false);
     await carregarCaixa();
+    mostrarToast("Caixa fechado com sucesso", "sucesso");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -157,8 +160,10 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
     try {
       if (modoEdicao && id !== null) {
         await atualizarCaixa(id, dados);
+        mostrarToast("Caixa atualizado com sucesso", "sucesso");
       } else {
         await abrirCaixa(dados);
+        mostrarToast("Caixa aberto com sucesso", "sucesso");
       }
       onVoltar();
     } catch (err) {
@@ -273,6 +278,7 @@ function CaixaForm({ id, onVoltar, permissoes }: CaixaFormProps) {
                 type="button"
                 className="usuario-form-btn-navegar"
                 title="Adicionar observação"
+                aria-label="Adicionar observação"
                 onClick={adicionarObservacao}
               >
                 <Plus size={16} />

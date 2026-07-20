@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ExternalLink, Send, Banknote, Undo2 } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Send, Banknote, Undo2, Eye } from "lucide-react";
 import {
   obterContaReceber,
   criarContaReceber,
@@ -8,13 +8,19 @@ import {
   STATUS_CONTA_RECEBER,
   ParcelaContaReceber,
 } from "../api/contaReceber";
-import { listarClientes, Cliente } from "../api/clientes";
+import { listarClientes, obterCliente, Cliente } from "../api/clientes";
 import { listarCategorias, Categoria } from "../api/categoria";
 import { listarTiposPagamentoPadrao, TipoPagamento } from "../api/tipoPagamento";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { visualizarRecibo } from "../utils/recibo";
 import { ItemMenu } from "../api/menu";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
+import ClienteModal from "./ClienteModal";
+import CategoriaModal from "./CategoriaModal";
+import TipoPagamentoModal from "./TipoPagamentoModal";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./UsuarioForm.css";
 import "./ContaReceberForm.css";
 
@@ -65,6 +71,19 @@ function parcelaPaga(p: ParcelaContaReceber): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
+function classeVencimento(dataVencimento: string, paga: boolean): string {
+  if (paga) return "";
+  const venc = dataVencimento.slice(0, 10);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  if (venc < hojeStr) return "conta-receber-vencimento-vencida";
+  if (venc === hojeStr) return "conta-receber-vencimento-hoje";
+  return "";
+}
+
+function parcelaEstornada(p: ParcelaContaReceber): boolean {
+  return !!p.Observacao?.startsWith("[Estorno");
+}
+
 function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaReceberFormProps) {
   const modoEdicao = id !== null;
 
@@ -90,13 +109,20 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
   const [tiposPagamento, setTiposPagamento] = useState<TipoPagamento[]>([]);
   const [sugestoesCliente, setSugestoesCliente] = useState<Cliente[]>([]);
   const [mostrarSugestoesCliente, setMostrarSugestoesCliente] = useState(false);
+  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
+  const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false);
+  const [mostrarModalTipoPagamento, setMostrarModalTipoPagamento] = useState(false);
 
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaContaReceber | null>(null);
   const [parcelaEmEstorno, setParcelaEmEstorno] = useState<ParcelaContaReceber | null>(null);
+  const [gerandoRecibo, setGerandoRecibo] = useState<number | null>(null);
 
   const algumaParcelaPaga = parcelas.some(parcelaPaga);
   const podeBaixarParcela = permissoes?.baixarParCR ?? false;
@@ -136,11 +162,90 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
   async function handleParcelaBaixada() {
     setParcelaEmBaixa(null);
     await carregarConta();
+    mostrarToast("Parcela baixada com sucesso", "sucesso");
   }
 
   async function handleParcelaEstornada() {
     setParcelaEmEstorno(null);
     await carregarConta();
+    mostrarToast("Baixa estornada com sucesso", "sucesso");
+  }
+
+  async function emitirRecibo(p: ParcelaContaReceber) {
+    if (id === null) return;
+    setGerandoRecibo(p.IdContaReceberParcela);
+    try {
+      let documentoPagador: string | null = null;
+      if (idCliente) {
+        try {
+          const cliente = await obterCliente(idCliente);
+          documentoPagador = cliente.CpfCnpj || null;
+        } catch {
+          documentoPagador = null;
+        }
+      }
+      await visualizarRecibo({
+        numeroRecibo: `${id}-${pad3(p.NumeroParcela)}`,
+        nomePagador: nomeCliente.trim() || "Cliente não identificado",
+        documentoPagador,
+        valor: p.ValorPago || p.ValorParcela,
+        dataPagamento: p.DataPagamento || hoje(),
+        formaPagamento: p.DescricaoTipoPagamento || "-",
+        referente: `à parcela nº ${pad3(p.NumeroParcela)}/${pad3(parcelas.length)} da Conta a Receber nº ${id}${
+          descricao ? ` (${descricao})` : ""
+        }`,
+        observacao: p.Observacao,
+      });
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } finally {
+      setGerandoRecibo(null);
+    }
+  }
+
+  // Quando a emissão coincide com o 1º vencimento (venda à vista), a procedure já baixa a
+  // parcela automaticamente na criação - sem isso, o recibo só ficaria acessível voltando pra
+  // lista e expandindo a linha. Aqui a gente detecta esse caso e já oferece o recibo na hora.
+  async function perguntarEVisualizarReciboAVista(idNovaConta: number) {
+    const contaCriada = await obterContaReceber(idNovaConta);
+    const parcelaAVista = contaCriada.parcelas.find(parcelaPaga);
+    if (!parcelaAVista) return;
+
+    const verRecibo = await confirmar({
+      titulo: "Pagamento à vista",
+      mensagem: "Essa parcela já nasceu paga (pagamento à vista). Deseja visualizar o recibo agora?",
+      textoConfirmar: "Ver recibo",
+      textoCancelar: "Agora não",
+    });
+    if (!verRecibo) return;
+
+    let documentoPagador: string | null = null;
+    if (contaCriada.idCliente) {
+      try {
+        const cliente = await obterCliente(contaCriada.idCliente);
+        documentoPagador = cliente.CpfCnpj || null;
+      } catch {
+        documentoPagador = null;
+      }
+    }
+    try {
+      await visualizarRecibo({
+        numeroRecibo: `${contaCriada.IdContaReceber}-${pad3(parcelaAVista.NumeroParcela)}`,
+        nomePagador: contaCriada.NomeCliente?.trim() || "Cliente não identificado",
+        documentoPagador,
+        valor: parcelaAVista.ValorPago || parcelaAVista.ValorParcela,
+        dataPagamento: parcelaAVista.DataPagamento || hoje(),
+        formaPagamento: parcelaAVista.DescricaoTipoPagamento || "-",
+        referente: `à parcela nº ${pad3(parcelaAVista.NumeroParcela)}/${pad3(
+          contaCriada.parcelas.length
+        )} da Conta a Receber nº ${contaCriada.IdContaReceber}${
+          contaCriada.Descricao ? ` (${contaCriada.Descricao})` : ""
+        }`,
+        observacao: parcelaAVista.Observacao,
+      });
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    }
   }
 
   useEffect(() => {
@@ -161,24 +266,44 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
     setMostrarSugestoesCliente(false);
   }
 
+  function handleClienteCriado(c: Cliente) {
+    selecionarCliente(c);
+    setMostrarModalCliente(false);
+  }
+
+  function handleCategoriaCriada(c: Categoria) {
+    setCategorias((atual) => [...atual, c].sort((a, b) => a.DescricaoCategoria.localeCompare(b.DescricaoCategoria)));
+    setIdCategoria(c.IdCategoria);
+    setMostrarModalCategoria(false);
+  }
+
+  function handleTipoPagamentoCriado(t: TipoPagamento) {
+    setTiposPagamento((atual) =>
+      [...atual, t].sort((a, b) => a.DescricaoTipoPagamento.localeCompare(b.DescricaoTipoPagamento))
+    );
+    setIdPrimeiroTipoPagamento(t.idTipoPagamento);
+    setMostrarModalTipoPagamento(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
 
-    if (!descricao || !idCategoria || !valorTotal || !dataEmissao) {
-      setErro("Informe descrição, categoria, valor total e data de emissão");
-      return;
-    }
     const valor = moedaParaNumero(valorTotal);
-    if (valor <= 0) {
-      setErro("O valor total deve ser maior que zero");
-      return;
-    }
     const parcelasNum = Number(totalParcelas || 0);
-    if (parcelasNum < 0) {
-      setErro("O total de parcelas não pode ser negativo");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!descricao.trim()) novosErros.descricao = "Informe a descrição";
+    if (!idCategoria) novosErros.idCategoria = "Informe a categoria";
+    if (!valorTotal) {
+      novosErros.valorTotal = "Informe o valor total";
+    } else if (valor <= 0) {
+      novosErros.valorTotal = "O valor total deve ser maior que zero";
     }
+    if (!dataEmissao) novosErros.dataEmissao = "Informe a data de emissão";
+    if (parcelasNum < 0) novosErros.totalParcelas = "O total de parcelas não pode ser negativo";
+    if (!idPrimeiroTipoPagamento) novosErros.idPrimeiroTipoPagamento = "Informe o tipo de pagamento";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0 || !idCategoria) return;
 
     const dados = {
       numeroDocumento: numeroDocumento || undefined,
@@ -202,8 +327,11 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
           ...dados,
           recalcularParcelas: algumaParcelaPaga ? false : recalcularParcelas,
         });
+        mostrarToast("Conta a receber atualizada com sucesso", "sucesso");
       } else {
-        await criarContaReceber(dados);
+        const { idContaReceber } = await criarContaReceber(dados);
+        mostrarToast("Conta a receber criada com sucesso", "sucesso");
+        await perguntarEVisualizarReciboAVista(idContaReceber);
       }
       onVoltar();
     } catch (err) {
@@ -230,7 +358,7 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
         <h2>{modoEdicao ? "Editar Conta a Receber" : "Nova Conta a Receber"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
           <div className="usuario-form-campo conta-receber-form-campo-documento">
             <label htmlFor="cr-numero-documento">Nº Documento</label>
@@ -243,7 +371,7 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
             />
           </div>
 
-          <div className="usuario-form-campo conta-receber-form-campo-data">
+          <div className={`usuario-form-campo conta-receber-form-campo-data ${erros.dataEmissao ? "campo-invalido" : ""}`}>
             <label htmlFor="cr-data-emissao">
               Data de Emissão <span className="obrigatorio">*</span>
             </label>
@@ -251,23 +379,31 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               id="cr-data-emissao"
               type="date"
               value={dataEmissao}
-              onChange={(e) => setDataEmissao(e.target.value)}
+              onChange={(e) => {
+                setDataEmissao(e.target.value);
+                if (erros.dataEmissao) setErros((atual) => ({ ...atual, dataEmissao: "" }));
+              }}
               required
             />
+            {erros.dataEmissao && <span className="usuario-form-campo-erro">{erros.dataEmissao}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className={`usuario-form-campo ${erros.descricao ? "campo-invalido" : ""}`}>
             <label htmlFor="cr-descricao">
               Descrição <span className="obrigatorio">*</span>
             </label>
             <input
               id="cr-descricao"
               value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
+              onChange={(e) => {
+                setDescricao(e.target.value);
+                if (erros.descricao) setErros((atual) => ({ ...atual, descricao: "" }));
+              }}
               placeholder="Digite a descrição"
               maxLength={255}
               required
             />
+            {erros.descricao && <span className="usuario-form-campo-erro">{erros.descricao}</span>}
           </div>
 
           <div className="usuario-form-campo conta-receber-form-campo-status">
@@ -303,10 +439,11 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Clientes"
-                onClick={() => navegarPara?.("clientes", "Cadastro de Clientes", "Cadastros")}
+                title="Cadastrar novo cliente"
+                aria-label="Cadastrar novo cliente"
+                onClick={() => setMostrarModalCliente(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
             {mostrarSugestoesCliente && sugestoesCliente.length > 0 && (
@@ -320,7 +457,7 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
             )}
           </div>
 
-          <div className="usuario-form-campo conta-receber-form-campo-categoria-larga">
+          <div className={`usuario-form-campo conta-receber-form-campo-categoria-larga ${erros.idCategoria ? "campo-invalido" : ""}`}>
             <label htmlFor="cr-categoria">
               Categoria <span className="obrigatorio">*</span>
             </label>
@@ -328,7 +465,10 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               <select
                 id="cr-categoria"
                 value={idCategoria ?? ""}
-                onChange={(e) => setIdCategoria(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setIdCategoria(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idCategoria) setErros((atual) => ({ ...atual, idCategoria: "" }));
+                }}
                 required
               >
                 <option value="">Selecione...</option>
@@ -341,31 +481,37 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Categorias"
-                onClick={() => navegarPara?.("categoria", "Cadastro de Categorias", "Cadastros")}
+                title="Cadastrar nova categoria"
+                aria-label="Cadastrar nova categoria"
+                onClick={() => setMostrarModalCategoria(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idCategoria && <span className="usuario-form-campo-erro">{erros.idCategoria}</span>}
           </div>
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-receber-form-campo-valor">
+          <div className={`usuario-form-campo conta-receber-form-campo-valor ${erros.valorTotal ? "campo-invalido" : ""}`}>
             <label htmlFor="cr-valor-total">
               Valor Total <span className="obrigatorio">*</span>
             </label>
             <input
               id="cr-valor-total"
               value={valorTotal}
-              onChange={(e) => setValorTotal(formatarMoeda(e.target.value))}
+              onChange={(e) => {
+                setValorTotal(formatarMoeda(e.target.value));
+                if (erros.valorTotal) setErros((atual) => ({ ...atual, valorTotal: "" }));
+              }}
               placeholder="R$ 0,00"
               inputMode="numeric"
               required
             />
+            {erros.valorTotal && <span className="usuario-form-campo-erro">{erros.valorTotal}</span>}
           </div>
 
-          <div className="usuario-form-campo conta-receber-form-campo-numero">
+          <div className={`usuario-form-campo conta-receber-form-campo-numero ${erros.totalParcelas ? "campo-invalido" : ""}`}>
             <label htmlFor="cr-total-parcelas">
               Total de Parcelas <span className="obrigatorio">*</span>
             </label>
@@ -374,9 +520,13 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               type="number"
               min={0}
               value={totalParcelas}
-              onChange={(e) => setTotalParcelas(e.target.value)}
+              onChange={(e) => {
+                setTotalParcelas(e.target.value);
+                if (erros.totalParcelas) setErros((atual) => ({ ...atual, totalParcelas: "" }));
+              }}
               required
             />
+            {erros.totalParcelas && <span className="usuario-form-campo-erro">{erros.totalParcelas}</span>}
           </div>
 
           <div className="usuario-form-campo conta-receber-form-campo-data">
@@ -400,13 +550,24 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
             />
           </div>
 
-          <div className="usuario-form-campo conta-receber-form-campo-tipo-pagamento">
-            <label htmlFor="cr-tipo-pagamento">Tipo de Pagamento</label>
+          <div
+            className={`usuario-form-campo conta-receber-form-campo-tipo-pagamento ${
+              erros.idPrimeiroTipoPagamento ? "campo-invalido" : ""
+            }`}
+          >
+            <label htmlFor="cr-tipo-pagamento">
+              Tipo de Pagamento <span className="obrigatorio">*</span>
+            </label>
             <div className="usuario-form-campo-com-acao">
               <select
                 id="cr-tipo-pagamento"
                 value={idPrimeiroTipoPagamento ?? ""}
-                onChange={(e) => setIdPrimeiroTipoPagamento(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setIdPrimeiroTipoPagamento(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idPrimeiroTipoPagamento)
+                    setErros((atual) => ({ ...atual, idPrimeiroTipoPagamento: "" }));
+                }}
+                required
               >
                 <option value="">Selecione...</option>
                 {tiposPagamento.map((t) => (
@@ -418,12 +579,16 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Tipos de Pagamento"
-                onClick={() => navegarPara?.("tipo-pagamento", "Cadastro de Tipos de Pagamento", "Cadastros")}
+                title="Cadastrar novo tipo de pagamento"
+                aria-label="Cadastrar novo tipo de pagamento"
+                onClick={() => setMostrarModalTipoPagamento(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idPrimeiroTipoPagamento && (
+              <span className="usuario-form-campo-erro">{erros.idPrimeiroTipoPagamento}</span>
+            )}
           </div>
 
           {modoEdicao && saldoDevedor !== null && (
@@ -472,13 +637,14 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
                 <thead>
                   <tr>
                     <th>Nº</th>
+                    <th>Cód. Parcela</th>
                     <th>Vencimento</th>
                     <th className="conta-receber-col-valor">Valor</th>
                     <th className="conta-receber-col-valor">Pago</th>
                     <th>Data Pagamento</th>
                     <th>Tipo Pagamento</th>
                     <th>Status</th>
-                    {(podeBaixarParcela || podeEstornarParcela) && (
+                    {(podeBaixarParcela || podeEstornarParcela || algumaParcelaPaga) && (
                       <th className="conta-receber-col-acoes">Ações</th>
                     )}
                   </tr>
@@ -490,7 +656,10 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
                     return (
                       <tr key={p.IdContaReceberParcela}>
                         <td>{pad3(p.NumeroParcela)}</td>
-                        <td>{new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</td>
+                        <td>{p.IdContaReceberParcela}</td>
+                        <td className={classeVencimento(p.DataVencimento, paga)}>
+                          {new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                        </td>
                         <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorParcela)}</td>
                         <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorPago)}</td>
                         <td>
@@ -501,14 +670,18 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
                         <td>{p.DescricaoTipoPagamento || "-"}</td>
                         <td>
                           <span className={`conta-receber-badge ${classe}`}>{label.toUpperCase()}</span>
+                          {parcelaEstornada(p) && (
+                            <span className="conta-receber-badge-estornada" title="Parcela estornada" />
+                          )}
                         </td>
-                        {(podeBaixarParcela || podeEstornarParcela) && (
+                        {(podeBaixarParcela || podeEstornarParcela || algumaParcelaPaga) && (
                           <td className="conta-receber-col-acoes">
                             {podeBaixarParcela && !paga && (
                               <button
                                 type="button"
                                 className="conta-receber-icone-acao"
                                 title="Dar baixa nesta parcela"
+                                aria-label="Dar baixa nesta parcela"
                                 onClick={() => setParcelaEmBaixa(p)}
                               >
                                 <Banknote size={16} />
@@ -519,9 +692,22 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
                                 type="button"
                                 className="conta-receber-icone-acao estorno"
                                 title="Estornar a baixa desta parcela"
+                                aria-label="Estornar a baixa desta parcela"
                                 onClick={() => setParcelaEmEstorno(p)}
                               >
                                 <Undo2 size={16} />
+                              </button>
+                            )}
+                            {paga && (
+                              <button
+                                type="button"
+                                className="conta-receber-icone-acao"
+                                title="Visualizar recibo"
+                                aria-label="Visualizar recibo"
+                                disabled={gerandoRecibo === p.IdContaReceberParcela}
+                                onClick={() => emitirRecibo(p)}
+                              >
+                                <Eye size={16} />
                               </button>
                             )}
                           </td>
@@ -558,6 +744,21 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
           parcela={parcelaEmEstorno}
           onCancelar={() => setParcelaEmEstorno(null)}
           onEstornada={handleParcelaEstornada}
+        />
+      )}
+
+      {mostrarModalCliente && (
+        <ClienteModal onCancelar={() => setMostrarModalCliente(false)} onCriado={handleClienteCriado} />
+      )}
+
+      {mostrarModalCategoria && (
+        <CategoriaModal onCancelar={() => setMostrarModalCategoria(false)} onCriada={handleCategoriaCriada} />
+      )}
+
+      {mostrarModalTipoPagamento && (
+        <TipoPagamentoModal
+          onCancelar={() => setMostrarModalTipoPagamento(false)}
+          onCriado={handleTipoPagamentoCriado}
         />
       )}
     </div>

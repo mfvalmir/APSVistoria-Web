@@ -80,7 +80,7 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // idFornecedor não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("razaoSocial", sql.VarChar, razaoSocial)
       .input("nomeFantasia", sql.VarChar, nomeFantasia || null)
@@ -90,11 +90,12 @@ router.post("/", authMiddleware, async (req, res) => {
       .input("observacao", sql.Text, observacao || null)
       .query(
         `INSERT INTO Fornecedor (idFornecedor, RazaoSocial, NomeFantasia, CpfCnpj, Telefone, Email, Observacao, Ativo)
+         OUTPUT INSERTED.idFornecedor
          VALUES ((SELECT ISNULL(MAX(idFornecedor), 0) + 1 FROM Fornecedor), @razaoSocial, @nomeFantasia,
                  @cpfCnpj, @telefone, @email, @observacao, 'A')`
       );
 
-    res.status(201).json({ mensagem: "Fornecedor criado" });
+    res.status(201).json({ idFornecedor: result.recordset[0].idFornecedor, mensagem: "Fornecedor criado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar fornecedor" });

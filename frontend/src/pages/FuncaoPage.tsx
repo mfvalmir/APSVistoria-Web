@@ -5,12 +5,18 @@ import { listarFuncoes, excluirFuncao, Funcao } from "../api/funcao";
 import { ItemMenu } from "../api/menu";
 import FuncaoForm from "./FuncaoForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./FuncaoPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -28,6 +34,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -39,6 +46,10 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("funcao", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("funcao"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -48,6 +59,12 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
       salvarColunasVisiveis("funcao", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("funcao", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -71,15 +88,16 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
   }, [busca, subView]);
 
   async function handleExcluir(funcao: Funcao) {
-    if (!window.confirm(`Excluir a função "${funcao.descricao}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir a função "${funcao.descricao}"?`, perigo: true }))) return;
     try {
       await excluirFuncao(funcao.idFuncao);
       carregar();
+      mostrarToast("Função excluída com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir a função");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir a função", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -103,9 +121,21 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
     return <FuncaoForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(funcoes.length / ITENS_POR_PAGINA));
+  const funcoesOrdenadas = ordenarLista(funcoes, ordenacao, {
+    id: (f) => f.idFuncao,
+    descricao: (f) => f.descricao,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Funcao>(COLUNAS, colunasVisiveis, {
+    id: (f) => String(f.idFuncao),
+    descricao: (f) => f.descricao,
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(funcoesOrdenadas.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const funcoesPagina = funcoes.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const funcoesPagina = funcoesOrdenadas.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="funcao-page">
@@ -114,6 +144,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
           type="button"
           className="funcao-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -129,6 +160,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
               type="button"
               className="funcao-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -138,6 +170,15 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
 
         <div className="funcao-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="funcoes"
+            titulo="Funções"
+            dados={funcoesOrdenadas}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="funcao-btn-criar" onClick={abrirCriacao}>
             Criar Função
@@ -145,17 +186,25 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
         )}
       </div>
 
-      <div className="funcao-tabela-wrapper">
+      <div className={`funcao-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="funcao-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
               <th className="funcao-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && funcoesPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="funcao-vazio">Carregando...</td>
               </tr>
@@ -173,6 +222,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
                       <button
                         className="funcao-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(f.idFuncao)}
                       >
                         <Pencil size={16} />
@@ -182,6 +232,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
                       <button
                         className="funcao-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(f)}
                       >
                         <Trash2 size={16} />
@@ -197,6 +248,7 @@ function FuncaoPage({ permissoes, voltarInicio }: FuncaoPageProps) {
 
       <div className="funcao-rodape">
         <span>{funcoes.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="funcao-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

@@ -128,7 +128,7 @@ table.conta-receber-form-parcelas-tabela th {
 }
 
 table.conta-receber-form-parcelas-tabela td {
-  padding: 7px 14px;
+  padding: 4px 14px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
 }
@@ -137,6 +137,34 @@ table.conta-receber-form-parcelas-tabela tbody tr:last-child td {
   border-bottom: none;
 }
 
+table.conta-receber-form-parcelas-tabela td.conta-receber-vencimento-vencida {
+  color: var(--cor-erro);
+  font-weight: 700;
+}
+
+table.conta-receber-form-parcelas-tabela td.conta-receber-vencimento-hoje {
+  color: #2f9e46;
+  font-weight: 700;
+}
+
+.conta-receber-badge-estornada {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #8a63d2;
+  vertical-align: middle;
+}
+
 table.conta-receber-form-parcelas-tabela tbody tr:nth-child(even) {
   background: var(--cor-fundo-secundario);
+}
+
+table.conta-receber-form-parcelas-tabela tbody tr:hover td {
+  background: #cfe0f2;
+}
+
+:root[data-theme="dark"] table.conta-receber-form-parcelas-tabela tbody tr:hover td {
+  background: #2c3540;
 }

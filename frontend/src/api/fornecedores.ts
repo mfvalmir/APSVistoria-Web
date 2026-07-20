@@ -34,8 +34,9 @@ export async function obterFornecedor(id: number): Promise<Fornecedor> {
   return data;
 }
 
-export async function criarFornecedor(dados: DadosFornecedor): Promise<void> {
-  await api.post("/fornecedores", dados);
+export async function criarFornecedor(dados: DadosFornecedor): Promise<{ idFornecedor: number }> {
+  const { data } = await api.post("/fornecedores", dados);
+  return data;
 }
 
 export async function atualizarFornecedor(id: number, dados: EdicaoFornecedor): Promise<void> {

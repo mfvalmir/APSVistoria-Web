@@ -62,16 +62,17 @@ router.post("/", authMiddleware, async (req, res) => {
     const pool = await getPool();
 
     // idCidade não é IDENTITY neste banco (padrão legado) - geramos o próximo valor manualmente.
-    await pool
+    const result = await pool
       .request()
       .input("descricaoCidade", sql.VarChar, descricaoCidade)
       .input("uf", sql.VarChar, uf.toUpperCase())
       .query(
         `INSERT INTO Cidade (idCidade, DescricaoCidade, UF)
+         OUTPUT INSERTED.idCidade
          VALUES ((SELECT ISNULL(MAX(idCidade), 0) + 1 FROM Cidade), @descricaoCidade, @uf)`
       );
 
-    res.status(201).json({ mensagem: "Cidade criada" });
+    res.status(201).json({ idCidade: result.recordset[0].idCidade, mensagem: "Cidade criada" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao criar cidade" });

@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Search, X, Pencil, Trash2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { listarFormularios, desativarFormulario, Formulario } from "../api/formularios";
 import { ItemMenu } from "../api/menu";
 import { getIcone } from "../components/iconRegistry";
 import FormularioForm from "./FormularioForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./FormulariosPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -31,6 +38,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -43,6 +51,10 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("formularios", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("formularios"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -52,6 +64,12 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
       salvarColunasVisiveis("formularios", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("formularios", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -75,9 +93,24 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
   }, [busca, status, subView]);
 
   async function handleExcluir(formulario: Formulario) {
-    if (!window.confirm(`Desativar o formulário "${formulario.Descricao || formulario.NomeFormulario}"?`)) return;
-    await desativarFormulario(formulario.FormularioID);
-    carregar();
+    if (
+      !(await confirmar({
+        mensagem: `Desativar o formulário "${formulario.Descricao || formulario.NomeFormulario}"?`,
+        perigo: true,
+      }))
+    )
+      return;
+    try {
+      await desativarFormulario(formulario.FormularioID);
+      carregar();
+      mostrarToast("Formulário desativado com sucesso", "sucesso");
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        mostrarToast(err.response.data?.erro || "Não foi possível desativar o formulário", "erro");
+      } else {
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
+      }
+    }
   }
 
   function abrirCriacao() {
@@ -99,11 +132,26 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
     return <FormularioForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(formularios.length / ITENS_POR_PAGINA));
+  const formulariosOrdenados = ordenarLista(formularios, ordenacao, {
+    id: (f) => f.FormularioID,
+    descricao: (f) => f.Descricao || "",
+    nome: (f) => f.NomeFormulario,
+    grupo: (f) => f.Grupo || "",
+    status: (f) => f.Ativo.trim(),
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Formulario>(COLUNAS, colunasVisiveis, {
+    id: (f) => String(f.FormularioID),
+    descricao: (f) => f.Descricao || "-",
+    nome: (f) => f.NomeFormulario,
+    grupo: (f) => f.Grupo || "-",
+    status: (f) => (f.Ativo.trim() === "A" ? "ATIVO" : "INATIVO"),
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(formulariosOrdenados.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const formulariosPagina = formularios.slice(
-    (paginaAtual - 1) * ITENS_POR_PAGINA,
-    paginaAtual * ITENS_POR_PAGINA
+  const formulariosPagina = formulariosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
   );
 
   return (
@@ -113,6 +161,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
           type="button"
           className="formularios-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -132,6 +181,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
               type="button"
               className="formularios-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -151,6 +201,15 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
 
         <div className="formularios-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="formularios"
+            titulo="Formulários"
+            dados={formulariosOrdenados}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="formularios-btn-criar" onClick={abrirCriacao}>
             Criar Formulário
@@ -158,20 +217,45 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
         )}
       </div>
 
-      <div className="formularios-tabela-wrapper">
+      <div className={`formularios-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="formularios-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
-              {colunasVisiveis.has("nome") && <th>Nome</th>}
-              {colunasVisiveis.has("grupo") && <th>Grupo</th>}
-              {colunasVisiveis.has("status") && <th className="formularios-col-status">Status</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("nome") && (
+                <ThOrdenavel campo="nome" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Nome
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("grupo") && (
+                <ThOrdenavel campo="grupo" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Grupo
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("status") && (
+                <ThOrdenavel
+                  campo="status"
+                  ordenacao={ordenacao}
+                  onOrdenar={alternarOrdenacao}
+                  className="formularios-col-status"
+                >
+                  Status
+                </ThOrdenavel>
+              )}
               <th className="formularios-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && formulariosPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="formularios-vazio">Carregando...</td>
               </tr>
@@ -208,6 +292,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
                         <button
                           className="formularios-icone-acao editar"
                           title="Editar"
+                          aria-label="Editar"
                           onClick={() => abrirEdicao(f.FormularioID)}
                         >
                           <Pencil size={16} />
@@ -217,6 +302,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
                         <button
                           className="formularios-icone-acao perigo"
                           title="Desativar"
+                          aria-label="Desativar"
                           onClick={() => handleExcluir(f)}
                         >
                           <Trash2 size={16} />
@@ -233,6 +319,7 @@ function FormulariosPage({ permissoes, voltarInicio }: FormulariosPageProps) {
 
       <div className="formularios-rodape">
         <span>{formularios.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="formularios-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

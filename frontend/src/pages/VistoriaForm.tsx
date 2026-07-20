@@ -1,18 +1,26 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ExternalLink, Send, Banknote, Undo2 } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Send, Banknote, Undo2, Eye } from "lucide-react";
 import { obterVistoria, criarVistoria, atualizarVistoria, STATUS_VISTORIA } from "../api/vistoria";
 import { ParcelaContaReceber } from "../api/contaReceber";
 import { listarClientes, criarCliente, Cliente } from "../api/clientes";
 import { listarResponsaveis, criarResponsavel, Responsavel } from "../api/responsaveis";
 import { buscarFuncionarios, FuncionarioResumo } from "../api/funcionarios";
 import { listarServicos, Servico } from "../api/servico";
-import { listarTiposPagamento, TipoPagamento } from "../api/tipoPagamento";
+import { listarTiposPagamento, TipoPagamento, ehTipoRetornoOuCortesia } from "../api/tipoPagamento";
 import { validarCPF, validarCNPJ } from "../utils/documento";
 import { focarProximoCampoAoEnter } from "../utils/form";
+import { visualizarRecibo } from "../utils/recibo";
 import { ItemMenu } from "../api/menu";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
+import ClienteModal from "./ClienteModal";
+import FuncionarioModal from "./FuncionarioModal";
+import ServicoModal from "./ServicoModal";
+import TipoPagamentoModal from "./TipoPagamentoModal";
+import ResponsavelModal from "./ResponsavelModal";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./UsuarioForm.css";
 import "./ContaReceberForm.css";
 import "./VistoriaForm.css";
@@ -95,6 +103,19 @@ function parcelaPaga(p: ParcelaContaReceber): boolean {
   return p.IdStatusParcela !== 0 || p.ValorPago > 0 || !!p.DataPagamento;
 }
 
+function classeVencimento(dataVencimento: string, paga: boolean): string {
+  if (paga) return "";
+  const venc = dataVencimento.slice(0, 10);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  if (venc < hojeStr) return "conta-receber-vencimento-vencida";
+  if (venc === hojeStr) return "conta-receber-vencimento-hoje";
+  return "";
+}
+
+function parcelaEstornada(p: ParcelaContaReceber): boolean {
+  return !!p.Observacao?.startsWith("[Estorno");
+}
+
 interface ParcelaPreview {
   numero: number;
   vencimento: string;
@@ -127,23 +148,32 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [nomeCliente, setNomeCliente] = useState("");
   const [clienteEncontrado, setClienteEncontrado] = useState<Cliente | null>(null);
+  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
+  const [sugestoesClientePorNomeCliente, setSugestoesClientePorNomeCliente] = useState<Cliente[]>([]);
+  const [mostrarSugestoesCliente, setMostrarSugestoesCliente] = useState(false);
 
   const [nomeResponsavel, setNomeResponsavel] = useState("");
+  const [idResponsavel, setIdResponsavel] = useState<number | null>(null);
   const [sugestoesResponsavel, setSugestoesResponsavel] = useState<Responsavel[]>([]);
+  const [sugestoesClientePorNome, setSugestoesClientePorNome] = useState<Cliente[]>([]);
   const [mostrarSugestoesResponsavel, setMostrarSugestoesResponsavel] = useState(false);
+  const [mostrarModalResponsavel, setMostrarModalResponsavel] = useState(false);
 
   const [idVistoriador, setIdVistoriador] = useState<number | null>(null);
   const [vistoriadores, setVistoriadores] = useState<FuncionarioResumo[]>([]);
+  const [mostrarModalVistoriador, setMostrarModalVistoriador] = useState(false);
 
   const [idServico, setIdServico] = useState<number | null>(null);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [valorUnitarioServico, setValorUnitarioServico] = useState("");
   const [quantidadeServico, setQuantidadeServico] = useState("1");
+  const [mostrarModalServico, setMostrarModalServico] = useState(false);
 
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(hoje());
   const [idPrimeiroTipoPagamento, setIdPrimeiroTipoPagamento] = useState<number | null>(null);
   const [tiposPagamento, setTiposPagamento] = useState<TipoPagamento[]>([]);
+  const [mostrarModalTipoPagamento, setMostrarModalTipoPagamento] = useState(false);
 
   const [idStatusVistoria, setIdStatusVistoria] = useState(0);
   const [saldoDevedor, setSaldoDevedor] = useState<number | null>(null);
@@ -158,15 +188,26 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
   const [carregando, setCarregando] = useState(modoEdicao);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaContaReceber | null>(null);
   const [parcelaEmEstorno, setParcelaEmEstorno] = useState<ParcelaContaReceber | null>(null);
+  const [gerandoRecibo, setGerandoRecibo] = useState<number | null>(null);
+  const [gerandoReciboAVista, setGerandoReciboAVista] = useState(false);
 
   const algumaParcelaPaga = parcelas.some(parcelaPaga);
   const podeBaixarParcela = permissoes?.baixarParCR ?? false;
   const podeEstornarParcela = permissoes?.estornarParCR ?? false;
 
   const valorTotalServico = moedaParaNumero(valorUnitarioServico) * (Number(quantidadeServico) || 0);
+
+  // Retorno/Cortesia só fazem sentido quando não há cobrança real (valor 0) - com valor maior
+  // que zero, esses dois tipos ficam de fora e só as formas de pagamento normais aparecem.
+  const tiposPagamentoDisponiveis = tiposPagamento.filter((t) =>
+    valorTotalServico === 0 ? ehTipoRetornoOuCortesia(t.DescricaoTipoPagamento) : !ehTipoRetornoOuCortesia(t.DescricaoTipoPagamento)
+  );
 
   // O banco tem um trigger (TR_Vistoria_TravarCampos_QuandoPagoOuParcial) que bloqueia
   // qualquer alteração de cabeçalho - e também exclusão - quando a vistoria já está Paga ou
@@ -186,6 +227,17 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     buscarFuncionarios("", { somenteVistoriador: true }).then(setVistoriadores);
   }, []);
 
+  // Se o valor passar de zero pra positivo (ou vice-versa) e o tipo de pagamento já escolhido
+  // não fizer mais parte da lista filtrada (ex.: tinha "Dinheiro" selecionado e o valor foi
+  // zerado), limpa a seleção em vez de deixar um valor inválido escondido no select. Só se
+  // aplica na criação - em edição o campo já vem travado.
+  useEffect(() => {
+    if (modoEdicao || idPrimeiroTipoPagamento === null || tiposPagamento.length === 0) return;
+    const aindaValido = tiposPagamentoDisponiveis.some((t) => t.idTipoPagamento === idPrimeiroTipoPagamento);
+    if (!aindaValido) setIdPrimeiroTipoPagamento(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valorTotalServico, tiposPagamento]);
+
   async function carregarVistoria() {
     if (id === null) return;
     const v = await obterVistoria(id);
@@ -194,6 +246,7 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     setCpfCnpj(v.CpfCnpj ? formatarDocumento(v.CpfCnpj) : "");
     setNomeCliente(v.NomeCliente || "");
     setNomeResponsavel(v.NomeResponsavel || "");
+    setIdResponsavel(v.idResponsavel);
     setIdVistoriador(v.idVistoriador);
     setIdServico(v.idServico);
     setValorUnitarioServico(numeroParaMoeda(v.ValorUnitarioServico));
@@ -234,13 +287,69 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     return () => clearTimeout(timeout);
   }, [cpfCnpj]);
 
+  // Ao encontrar um cliente já cadastrado, além de alimentar as sugestões, já preenche o
+  // responsável automaticamente (se houver e o campo ainda estiver vazio) - evita ter que abrir
+  // o dropdown e escolher manualmente o mesmo responsável de sempre.
   useEffect(() => {
     if (!clienteEncontrado) {
       setSugestoesResponsavel([]);
       return;
     }
-    listarResponsaveis(clienteEncontrado.idCliente).then(setSugestoesResponsavel);
+    listarResponsaveis(clienteEncontrado.idCliente).then((responsaveis) => {
+      setSugestoesResponsavel(responsaveis);
+      setIdResponsavel((atual) => {
+        if (atual && responsaveis.some((r) => r.idResponsavel === atual)) return atual;
+        return responsaveis[0]?.idResponsavel ?? null;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteEncontrado]);
+
+  // Enquanto o cliente ainda não foi localizado pelo Cpf/Cnpj, o campo Responsável também busca
+  // Clientes pelo nome digitado - se o atendente já souber o nome do cliente (mesmo sem o
+  // documento em mãos), selecionar um resultado já preenche o resto dos dados. Se não selecionar
+  // nada, o texto digitado segue normalmente como nome do responsável.
+  useEffect(() => {
+    if (clienteEncontrado || nomeResponsavel.trim().length < 2) {
+      setSugestoesClientePorNome([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      listarClientes(nomeResponsavel).then(setSugestoesClientePorNome);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [nomeResponsavel, clienteEncontrado]);
+
+  // Mesma ideia, mas buscando direto pelo nome digitado no próprio campo Cliente - útil quando o
+  // atendente nem chegou a digitar o Cpf/Cnpj ainda.
+  useEffect(() => {
+    if (clienteEncontrado || nomeCliente.trim().length < 2) {
+      setSugestoesClientePorNomeCliente([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      listarClientes(nomeCliente).then(setSugestoesClientePorNomeCliente);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [nomeCliente, clienteEncontrado]);
+
+  function selecionarCliente(c: Cliente) {
+    setCpfCnpj(formatarDocumento(c.CpfCnpj));
+    setNomeCliente(c.NomeCliente);
+    setClienteEncontrado(c);
+    setNomeResponsavel("");
+    setSugestoesClientePorNome([]);
+    setSugestoesClientePorNomeCliente([]);
+    setMostrarSugestoesResponsavel(false);
+    setMostrarSugestoesCliente(false);
+  }
+
+  function handleClienteCriado(c: Cliente) {
+    setCpfCnpj(formatarDocumento(c.CpfCnpj));
+    setNomeCliente(c.NomeCliente);
+    setClienteEncontrado(c);
+    setMostrarModalCliente(false);
+  }
 
   function selecionarServico(idSelecionado: number | null) {
     setIdServico(idSelecionado);
@@ -248,15 +357,41 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     if (servico) setValorUnitarioServico(numeroParaMoeda(servico.ValorServico));
   }
 
-  function selecionarResponsavel(r: Responsavel) {
-    setNomeResponsavel(r.NomeResponsavel);
-    setMostrarSugestoesResponsavel(false);
+  function handleVistoriadorCriado(f: FuncionarioResumo) {
+    setVistoriadores((atual) => [...atual, f].sort((a, b) => a.NomeFuncionario.localeCompare(b.NomeFuncionario)));
+    setIdVistoriador(f.IdFuncionario);
+    setMostrarModalVistoriador(false);
+  }
+
+  function handleServicoCriado(s: Servico) {
+    setServicos((atual) => [...atual, s].sort((a, b) => a.DescricaoServico.localeCompare(b.DescricaoServico)));
+    selecionarServico(s.idServico);
+    setMostrarModalServico(false);
+  }
+
+  function handleTipoPagamentoCriado(t: TipoPagamento) {
+    setTiposPagamento((atual) =>
+      [...atual, t].sort((a, b) => a.DescricaoTipoPagamento.localeCompare(b.DescricaoTipoPagamento))
+    );
+    setIdPrimeiroTipoPagamento(t.idTipoPagamento);
+    setMostrarModalTipoPagamento(false);
+  }
+
+  function handleResponsavelCriado(r: Responsavel) {
+    setSugestoesResponsavel((atual) => [...atual, r]);
+    setIdResponsavel(r.idResponsavel);
+    setMostrarModalResponsavel(false);
   }
 
   // Resolve (ou cria) o Cliente pelo Cpf/Cnpj digitado, e o Responsável (vinculado a esse
-  // Cliente) pelo nome digitado - fluxo pensado pro atendimento de vistoria, onde o cliente
-  // muitas vezes ainda não está cadastrado.
+  // Cliente) - fluxo pensado pro atendimento de vistoria, onde o cliente muitas vezes ainda não
+  // está cadastrado. Quando o cliente já foi resolvido (encontrado pelo Cpf/Cnpj ou cadastrado
+  // pelo modal), o responsável já vem escolhido no dropdown, sem precisar resolver por nome.
   async function resolverClienteEResponsavel(): Promise<{ idCliente: number; idResponsavel?: number }> {
+    if (clienteEncontrado) {
+      return { idCliente: clienteEncontrado.idCliente, idResponsavel: idResponsavel ?? undefined };
+    }
+
     const digitos = cpfCnpj.replace(/\D/g, "");
     const tipoPessoa: "F" | "J" = digitos.length > 11 ? "J" : "F";
 
@@ -280,22 +415,130 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     const matchResp = responsaveis.find((r) => r.NomeResponsavel.trim().toLowerCase() === nomeResp.toLowerCase());
     if (matchResp) return { idCliente, idResponsavel: matchResp.idResponsavel };
 
-    await criarResponsavel(idCliente, { nomeResponsavel: nomeResp });
-    const responsaveisAtualizados = await listarResponsaveis(idCliente);
-    const novoResp = responsaveisAtualizados.find(
-      (r) => r.NomeResponsavel.trim().toLowerCase() === nomeResp.toLowerCase()
-    );
-    return { idCliente, idResponsavel: novoResp?.idResponsavel };
+    const { idResponsavel: novoId } = await criarResponsavel(idCliente, { nomeResponsavel: nomeResp });
+    return { idCliente, idResponsavel: novoId };
   }
 
   async function handleParcelaBaixada() {
     setParcelaEmBaixa(null);
     await carregarVistoria();
+    mostrarToast("Parcela baixada com sucesso", "sucesso");
   }
 
   async function handleParcelaEstornada() {
     setParcelaEmEstorno(null);
     await carregarVistoria();
+    mostrarToast("Baixa estornada com sucesso", "sucesso");
+  }
+
+  async function emitirRecibo(p: ParcelaContaReceber) {
+    if (id === null) return;
+    setGerandoRecibo(p.IdContaReceberParcela);
+    try {
+      const nomeServico = servicos.find((s) => s.idServico === idServico)?.DescricaoServico || "-";
+      await visualizarRecibo({
+        numeroRecibo: `${id}-${pad3(p.NumeroParcela)}`,
+        nomePagador: nomeCliente.trim() || "Cliente não identificado",
+        documentoPagador: cpfCnpj || null,
+        valor: p.ValorPago || p.ValorParcela,
+        dataPagamento: p.DataPagamento || hoje(),
+        formaPagamento: p.DescricaoTipoPagamento || "-",
+        referente: `à parcela nº ${pad3(p.NumeroParcela)}/${pad3(parcelas.length)} da Vistoria nº ${id} - Veículo placa ${placaVeiculo} - Serviço: ${nomeServico}`,
+        observacao: p.Observacao,
+      });
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } finally {
+      setGerandoRecibo(null);
+    }
+  }
+
+  // A 1ª parcela de uma Vistoria à vista nunca vira uma linha em ContaReceberParcela - a
+  // procedure Manter_Vistoria trata esse pagamento só via CaixaMovimento, ligado direto na
+  // Vistoria (idContaReceber só é gravado a partir da 2ª parcela em diante, se houver). Por
+  // isso o recibo desse pagamento é montado a partir do próprio cabeçalho da Vistoria
+  // (idStatusVistoria 1=Pago ou 2=Parcial indica que a 1ª parcela nasceu paga), não de uma
+  // parcela específica.
+  function dadosReciboAVista(v: {
+    idVistoria: number;
+    NomeCliente: string | null;
+    CpfCnpj: string | null;
+    ValorTotalServico: number;
+    SaldoDevedor: number | null;
+    DataEmissao: string;
+    DescricaoTipoPagamento: string | null;
+    PlacaVeiculo: string;
+    DescricaoServico: string | null;
+    Observacao: string | null;
+    TotalParcelas: number;
+  }) {
+    // Com mais de 1 parcela, o que nasce pago é só a entrada - o restante ainda está em aberto
+    // nas parcelas seguintes. Com 1 parcela só, o pagamento é o valor à vista, total mesmo.
+    const tipoPagamento = v.TotalParcelas > 1 ? "da entrada" : "à vista";
+    return {
+      numeroRecibo: `${v.idVistoria}-001`,
+      nomePagador: v.NomeCliente?.trim() || "Cliente não identificado",
+      documentoPagador: v.CpfCnpj || null,
+      valor: v.ValorTotalServico - (v.SaldoDevedor ?? 0),
+      dataPagamento: v.DataEmissao,
+      formaPagamento: v.DescricaoTipoPagamento || "-",
+      referente: `ao pagamento ${tipoPagamento} da Vistoria nº ${v.idVistoria} - Veículo placa ${
+        v.PlacaVeiculo
+      } - Serviço: ${v.DescricaoServico || "-"}`,
+      observacao: v.Observacao,
+    };
+  }
+
+  async function perguntarEVisualizarReciboAVista(idNovaVistoria: number) {
+    const vistoriaCriada = await obterVistoria(idNovaVistoria);
+    const nasceuPaga = vistoriaCriada.idStatusVistoria === 1 || vistoriaCriada.idStatusVistoria === 2;
+    if (!nasceuPaga) return;
+
+    const verRecibo = await confirmar({
+      titulo: "Pagamento à vista",
+      mensagem:
+        "A 1ª parcela já nasceu paga (lançada direto no caixa - não aparece na tabela de parcelas). Deseja visualizar o recibo agora?",
+      textoConfirmar: "Ver recibo",
+      textoCancelar: "Agora não",
+    });
+    if (!verRecibo) return;
+
+    try {
+      await visualizarRecibo(dadosReciboAVista(vistoriaCriada));
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    }
+  }
+
+  async function verReciboAVista() {
+    setGerandoReciboAVista(true);
+    try {
+      const nomeServico = servicos.find((s) => s.idServico === idServico)?.DescricaoServico || "-";
+      const formaPagamentoAVista =
+        tiposPagamento.find((t) => t.idTipoPagamento === idPrimeiroTipoPagamento)?.DescricaoTipoPagamento || "-";
+      await visualizarRecibo(
+        dadosReciboAVista({
+          idVistoria: id!,
+          NomeCliente: nomeCliente,
+          CpfCnpj: cpfCnpj,
+          ValorTotalServico: valorTotalServico,
+          // Usa o SaldoDevedor congelado da Vistoria (gravado só na criação), não o
+          // saldoDevedorAtual recalculado a partir das parcelas 2..N - senão uma baixa
+          // posterior de outra parcela alteraria por engano o valor deste recibo.
+          SaldoDevedor: saldoDevedor,
+          DataEmissao: dataEmissao,
+          DescricaoTipoPagamento: formaPagamentoAVista,
+          PlacaVeiculo: placaVeiculo,
+          DescricaoServico: nomeServico,
+          Observacao: observacao || null,
+          TotalParcelas: Number(totalParcelas),
+        })
+      );
+    } catch {
+      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } finally {
+      setGerandoReciboAVista(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -303,27 +546,21 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
     if (formTotalmenteTravado) return;
     setErro("");
 
-    if (!placaVeiculo.trim()) {
-      setErro("Informe a placa do veículo");
-      return;
-    }
-    if (!documentoValido(cpfCnpj)) {
-      setErro("Cpf/Cnpj inválido");
-      return;
-    }
-    if (!idServico) {
-      setErro("Selecione o serviço");
-      return;
-    }
-    if (valorTotalServico <= 0) {
-      setErro("O valor total do serviço deve ser maior que zero");
-      return;
-    }
     const parcelasNum = Number(totalParcelas || 1);
-    if (parcelasNum < 1) {
-      setErro("O número de parcelas deve ser maior que zero");
-      return;
+    const novosErros: Record<string, string> = {};
+    if (!placaVeiculo.trim()) novosErros.placaVeiculo = "Informe a placa do veículo";
+    if (!cpfCnpj.trim()) {
+      novosErros.cpfCnpj = "Informe o Cpf/Cnpj";
+    } else if (!documentoValido(cpfCnpj)) {
+      novosErros.cpfCnpj = "Cpf/Cnpj inválido";
     }
+    if (!idServico) novosErros.idServico = "Selecione o serviço";
+    // Valor 0 é permitido (vistoria de cortesia/retorno, que não gera cobrança) - só valor
+    // negativo é inválido, o que o próprio input de moeda já impede de digitar.
+    if (valorTotalServico < 0) novosErros.valorUnitarioServico = "O valor total do serviço não pode ser negativo";
+    if (parcelasNum < 1) novosErros.totalParcelas = "O número de parcelas deve ser maior que zero";
+    setErros(novosErros);
+    if (Object.keys(novosErros).length > 0 || !idServico) return;
 
     setSalvando(true);
     try {
@@ -348,8 +585,11 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
 
       if (modoEdicao && id !== null) {
         await atualizarVistoria(id, dados);
+        mostrarToast("Vistoria atualizada com sucesso", "sucesso");
       } else {
-        await criarVistoria(dados);
+        const { idVistoria } = await criarVistoria(dados);
+        mostrarToast("Vistoria lançada com sucesso", "sucesso");
+        await perguntarEVisualizarReciboAVista(idVistoria);
       }
       onVoltar();
     } catch (err) {
@@ -378,7 +618,7 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
         <h2>{modoEdicao ? "Editar Vistoria" : "Lançar Vistoria"}</h2>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form">
+      <form onSubmit={handleSubmit} onKeyDown={focarProximoCampoAoEnter} className="usuario-form" noValidate>
         <div className="usuario-form-linha">
           <div className="usuario-form-campo conta-receber-form-campo-data">
             <label htmlFor="vf-data-emissao">
@@ -394,38 +634,46 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
             />
           </div>
 
-          <div className="usuario-form-campo usuario-form-campo-status">
+          <div className={`usuario-form-campo usuario-form-campo-status ${erros.placaVeiculo ? "campo-invalido" : ""}`}>
             <label htmlFor="vf-placa">
               Placa do Veículo <span className="obrigatorio">*</span>
             </label>
             <input
               id="vf-placa"
               value={placaVeiculo}
-              onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setPlacaVeiculo(e.target.value.toUpperCase());
+                if (erros.placaVeiculo) setErros((atual) => ({ ...atual, placaVeiculo: "" }));
+              }}
               placeholder="ABC1D23"
               maxLength={7}
               disabled={formTotalmenteTravado}
               required
             />
+            {erros.placaVeiculo && <span className="usuario-form-campo-erro">{erros.placaVeiculo}</span>}
           </div>
 
-          <div className="usuario-form-campo vistoria-form-campo-documento">
+          <div className={`usuario-form-campo vistoria-form-campo-documento ${erros.cpfCnpj ? "campo-invalido" : ""}`}>
             <label htmlFor="vf-cpf-cnpj">
               Cpf/Cnpj <span className="obrigatorio">*</span>
             </label>
             <input
               id="vf-cpf-cnpj"
               value={cpfCnpj}
-              onChange={(e) => setCpfCnpj(formatarDocumento(e.target.value))}
+              onChange={(e) => {
+                setCpfCnpj(formatarDocumento(e.target.value));
+                if (erros.cpfCnpj) setErros((atual) => ({ ...atual, cpfCnpj: "" }));
+              }}
               placeholder="000.000.000-00"
               inputMode="numeric"
               maxLength={18}
               disabled={formTotalmenteTravado}
               required
             />
+            {erros.cpfCnpj && <span className="usuario-form-campo-erro">{erros.cpfCnpj}</span>}
           </div>
 
-          <div className="usuario-form-campo">
+          <div className="usuario-form-campo usuario-form-combobox">
             <label htmlFor="vf-cliente">
               Cliente {clienteEncontrado ? "(já cadastrado)" : "(nome opcional - deixe em branco se não houver)"}
             </label>
@@ -434,7 +682,10 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                 id="vf-cliente"
                 value={nomeCliente}
                 onChange={(e) => setNomeCliente(e.target.value)}
-                placeholder="Nome do cliente"
+                onFocus={() => setMostrarSugestoesCliente(true)}
+                onBlur={() => setTimeout(() => setMostrarSugestoesCliente(false), 150)}
+                placeholder="Nome do cliente ou digite pra buscar..."
+                autoComplete="off"
                 maxLength={50}
                 disabled={!!clienteEncontrado || formTotalmenteTravado}
                 readOnly={!!clienteEncontrado}
@@ -442,12 +693,23 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Clientes"
-                onClick={() => navegarPara?.("clientes", "Cadastro de Clientes", "Cadastros")}
+                title="Cadastrar novo cliente"
+                aria-label="Cadastrar novo cliente"
+                disabled={formTotalmenteTravado}
+                onClick={() => setMostrarModalCliente(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {mostrarSugestoesCliente && sugestoesClientePorNomeCliente.length > 0 && (
+              <ul className="usuario-form-sugestoes">
+                {sugestoesClientePorNomeCliente.map((c) => (
+                  <li key={`cliente-nome-${c.idCliente}`} onMouseDown={() => selecionarCliente(c)}>
+                    {c.NomeCliente} <span className="vistoria-sugestao-doc">({formatarDocumento(c.CpfCnpj)})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="usuario-form-campo conta-receber-form-campo-status">
@@ -464,28 +726,59 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo usuario-form-combobox">
-            <label htmlFor="vf-responsavel">Responsável (Cliente)</label>
-            <input
-              id="vf-responsavel"
-              value={nomeResponsavel}
-              onChange={(e) => setNomeResponsavel(e.target.value)}
-              onFocus={() => setMostrarSugestoesResponsavel(true)}
-              onBlur={() => setTimeout(() => setMostrarSugestoesResponsavel(false), 150)}
-              placeholder="Nome do responsável"
-              autoComplete="off"
-              disabled={formTotalmenteTravado}
-            />
-            {mostrarSugestoesResponsavel && sugestoesResponsavel.length > 0 && (
-              <ul className="usuario-form-sugestoes">
-                {sugestoesResponsavel.map((r) => (
-                  <li key={r.idResponsavel} onMouseDown={() => selecionarResponsavel(r)}>
-                    {r.NomeResponsavel}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {clienteEncontrado ? (
+            <div className="usuario-form-campo conta-receber-form-campo-categoria-larga">
+              <label htmlFor="vf-responsavel">Responsável (Cliente)</label>
+              <div className="usuario-form-campo-com-acao">
+                <select
+                  id="vf-responsavel"
+                  value={idResponsavel ?? ""}
+                  onChange={(e) => setIdResponsavel(e.target.value ? Number(e.target.value) : null)}
+                  disabled={formTotalmenteTravado}
+                >
+                  <option value="">Nenhum</option>
+                  {sugestoesResponsavel.map((r) => (
+                    <option key={r.idResponsavel} value={r.idResponsavel}>
+                      {r.NomeResponsavel}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="usuario-form-btn-navegar"
+                  title="Cadastrar novo responsável"
+                  aria-label="Cadastrar novo responsável"
+                  disabled={formTotalmenteTravado}
+                  onClick={() => setMostrarModalResponsavel(true)}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="usuario-form-campo usuario-form-combobox">
+              <label htmlFor="vf-responsavel">Responsável (Cliente)</label>
+              <input
+                id="vf-responsavel"
+                value={nomeResponsavel}
+                onChange={(e) => setNomeResponsavel(e.target.value)}
+                onFocus={() => setMostrarSugestoesResponsavel(true)}
+                onBlur={() => setTimeout(() => setMostrarSugestoesResponsavel(false), 150)}
+                placeholder="Nome do responsável ou do cliente..."
+                autoComplete="off"
+                disabled={formTotalmenteTravado}
+              />
+              {mostrarSugestoesResponsavel && sugestoesClientePorNome.length > 0 && (
+                <ul className="usuario-form-sugestoes">
+                  {sugestoesClientePorNome.map((c) => (
+                    <li key={`cliente-${c.idCliente}`} onMouseDown={() => selecionarCliente(c)}>
+                      {c.NomeCliente} <span className="vistoria-sugestao-doc">({formatarDocumento(c.CpfCnpj)})</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="usuario-form-campo conta-receber-form-campo-categoria-larga">
             <label htmlFor="vf-vistoriador">Vistoriador</label>
@@ -506,17 +799,19 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Funcionários"
-                onClick={() => navegarPara?.("funcionarios", "Cadastro de Funcionários", "Cadastros")}
+                title="Cadastrar novo vistoriador"
+                aria-label="Cadastrar novo vistoriador"
+                disabled={formTotalmenteTravado}
+                onClick={() => setMostrarModalVistoriador(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
           </div>
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-receber-form-campo-categoria-larga">
+          <div className={`usuario-form-campo conta-receber-form-campo-categoria-larga ${erros.idServico ? "campo-invalido" : ""}`}>
             <label htmlFor="vf-servico">
               Serviço <span className="obrigatorio">*</span>
             </label>
@@ -524,7 +819,10 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               <select
                 id="vf-servico"
                 value={idServico ?? ""}
-                onChange={(e) => selecionarServico(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  selecionarServico(e.target.value ? Number(e.target.value) : null);
+                  if (erros.idServico) setErros((atual) => ({ ...atual, idServico: "" }));
+                }}
                 disabled={modoEdicao}
                 required
               >
@@ -538,24 +836,33 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Serviços"
-                onClick={() => navegarPara?.("servicos", "Cadastro de Serviços", "Cadastros")}
+                title="Cadastrar novo serviço"
+                aria-label="Cadastrar novo serviço"
+                disabled={modoEdicao}
+                onClick={() => setMostrarModalServico(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
+            {erros.idServico && <span className="usuario-form-campo-erro">{erros.idServico}</span>}
           </div>
 
-          <div className="usuario-form-campo conta-receber-form-campo-valor">
+          <div className={`usuario-form-campo conta-receber-form-campo-valor ${erros.valorUnitarioServico ? "campo-invalido" : ""}`}>
             <label htmlFor="vf-valor-unitario">Valor Unitário</label>
             <input
               id="vf-valor-unitario"
               value={valorUnitarioServico}
-              onChange={(e) => setValorUnitarioServico(formatarMoeda(e.target.value))}
+              onChange={(e) => {
+                setValorUnitarioServico(formatarMoeda(e.target.value));
+                if (erros.valorUnitarioServico) setErros((atual) => ({ ...atual, valorUnitarioServico: "" }));
+              }}
               placeholder="R$ 0,00"
               inputMode="numeric"
               disabled={modoEdicao}
             />
+            {erros.valorUnitarioServico && (
+              <span className="usuario-form-campo-erro">{erros.valorUnitarioServico}</span>
+            )}
           </div>
 
           <div className="usuario-form-campo conta-receber-form-campo-numero">
@@ -577,7 +884,7 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
         </div>
 
         <div className="usuario-form-linha">
-          <div className="usuario-form-campo conta-receber-form-campo-numero">
+          <div className={`usuario-form-campo conta-receber-form-campo-numero ${erros.totalParcelas ? "campo-invalido" : ""}`}>
             <label htmlFor="vf-total-parcelas">
               Nº de Parcelas <span className="obrigatorio">*</span>
             </label>
@@ -586,10 +893,14 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               type="number"
               min={1}
               value={totalParcelas}
-              onChange={(e) => setTotalParcelas(e.target.value)}
+              onChange={(e) => {
+                setTotalParcelas(e.target.value);
+                if (erros.totalParcelas) setErros((atual) => ({ ...atual, totalParcelas: "" }));
+              }}
               disabled={modoEdicao}
               required
             />
+            {erros.totalParcelas && <span className="usuario-form-campo-erro">{erros.totalParcelas}</span>}
           </div>
 
           <div className="usuario-form-campo conta-receber-form-campo-data">
@@ -613,7 +924,7 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                 disabled={modoEdicao}
               >
                 <option value="">Selecione...</option>
-                {tiposPagamento.map((t) => (
+                {tiposPagamentoDisponiveis.map((t) => (
                   <option key={t.idTipoPagamento} value={t.idTipoPagamento}>
                     {t.DescricaoTipoPagamento}
                   </option>
@@ -622,10 +933,12 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
               <button
                 type="button"
                 className="usuario-form-btn-navegar"
-                title="Ir para Cadastro de Tipos de Pagamento"
-                onClick={() => navegarPara?.("tipo-pagamento", "Cadastro de Tipos de Pagamento", "Cadastros")}
+                title="Cadastrar novo tipo de pagamento"
+                aria-label="Cadastrar novo tipo de pagamento"
+                disabled={modoEdicao}
+                onClick={() => setMostrarModalTipoPagamento(true)}
               >
-                <ExternalLink size={16} />
+                <MoreHorizontal size={16} />
               </button>
             </div>
           </div>
@@ -709,6 +1022,24 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
           </div>
         )}
 
+        {modoEdicao && (idStatusVistoria === 1 || idStatusVistoria === 2) && (
+          <div className="vistoria-form-avista">
+            <p>
+              A 1ª parcela nasceu paga (pagamento à vista lançado direto no caixa) - por isso não aparece na
+              tabela de parcelas abaixo.
+            </p>
+            <button
+              type="button"
+              className="vistoria-form-btn-recibo-avista"
+              disabled={gerandoReciboAVista}
+              onClick={verReciboAVista}
+            >
+              <Eye size={16} />
+              Visualizar recibo
+            </button>
+          </div>
+        )}
+
         {modoEdicao && parcelas.length > 0 && (
           <div className="conta-receber-form-parcelas">
             <h3>Parcelas</h3>
@@ -717,13 +1048,14 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                 <thead>
                   <tr>
                     <th>Nº</th>
+                    <th>Cód. Parcela</th>
                     <th>Vencimento</th>
                     <th className="conta-receber-col-valor">Valor</th>
                     <th className="conta-receber-col-valor">Pago</th>
                     <th>Data Pagamento</th>
                     <th>Tipo Pagamento</th>
                     <th>Status</th>
-                    {(podeBaixarParcela || podeEstornarParcela) && (
+                    {(podeBaixarParcela || podeEstornarParcela || algumaParcelaPaga) && (
                       <th className="conta-receber-col-acoes">Ações</th>
                     )}
                   </tr>
@@ -735,7 +1067,10 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                     return (
                       <tr key={p.IdContaReceberParcela}>
                         <td>{pad3(p.NumeroParcela)}</td>
-                        <td>{new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</td>
+                        <td>{p.IdContaReceberParcela}</td>
+                        <td className={classeVencimento(p.DataVencimento, paga)}>
+                          {new Date(p.DataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                        </td>
                         <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorParcela)}</td>
                         <td className="conta-receber-col-valor">{numeroParaMoeda(p.ValorPago)}</td>
                         <td>
@@ -746,14 +1081,18 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                         <td>{p.DescricaoTipoPagamento || "-"}</td>
                         <td>
                           <span className={`conta-receber-badge ${classe}`}>{label.toUpperCase()}</span>
+                          {parcelaEstornada(p) && (
+                            <span className="conta-receber-badge-estornada" title="Parcela estornada" />
+                          )}
                         </td>
-                        {(podeBaixarParcela || podeEstornarParcela) && (
+                        {(podeBaixarParcela || podeEstornarParcela || algumaParcelaPaga) && (
                           <td className="conta-receber-col-acoes">
                             {podeBaixarParcela && !paga && (
                               <button
                                 type="button"
                                 className="conta-receber-icone-acao"
                                 title="Dar baixa nesta parcela"
+                                aria-label="Dar baixa nesta parcela"
                                 onClick={() => setParcelaEmBaixa(p)}
                               >
                                 <Banknote size={16} />
@@ -764,9 +1103,22 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
                                 type="button"
                                 className="conta-receber-icone-acao estorno"
                                 title="Estornar a baixa desta parcela"
+                                aria-label="Estornar a baixa desta parcela"
                                 onClick={() => setParcelaEmEstorno(p)}
                               >
                                 <Undo2 size={16} />
+                              </button>
+                            )}
+                            {paga && (
+                              <button
+                                type="button"
+                                className="conta-receber-icone-acao"
+                                title="Visualizar recibo"
+                                aria-label="Visualizar recibo"
+                                disabled={gerandoRecibo === p.IdContaReceberParcela}
+                                onClick={() => emitirRecibo(p)}
+                              >
+                                <Eye size={16} />
                               </button>
                             )}
                           </td>
@@ -805,6 +1157,33 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
           parcela={parcelaEmEstorno}
           onCancelar={() => setParcelaEmEstorno(null)}
           onEstornada={handleParcelaEstornada}
+        />
+      )}
+
+      {mostrarModalCliente && (
+        <ClienteModal onCancelar={() => setMostrarModalCliente(false)} onCriado={handleClienteCriado} />
+      )}
+
+      {mostrarModalResponsavel && clienteEncontrado && (
+        <ResponsavelModal
+          idCliente={clienteEncontrado.idCliente}
+          onCancelar={() => setMostrarModalResponsavel(false)}
+          onCriado={handleResponsavelCriado}
+        />
+      )}
+
+      {mostrarModalVistoriador && (
+        <FuncionarioModal onCancelar={() => setMostrarModalVistoriador(false)} onCriado={handleVistoriadorCriado} />
+      )}
+
+      {mostrarModalServico && (
+        <ServicoModal onCancelar={() => setMostrarModalServico(false)} onCriado={handleServicoCriado} />
+      )}
+
+      {mostrarModalTipoPagamento && (
+        <TipoPagamentoModal
+          onCancelar={() => setMostrarModalTipoPagamento(false)}
+          onCriado={handleTipoPagamentoCriado}
         />
       )}
     </div>

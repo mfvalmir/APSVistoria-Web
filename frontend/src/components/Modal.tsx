@@ -27,7 +27,7 @@ function Modal({ titulo, onFechar, children }: ModalProps) {
       <div className="modal-painel" role="dialog" aria-modal="true">
         <div className="modal-cabecalho">
           <h3>{titulo}</h3>
-          <button type="button" className="modal-fechar" onClick={onFechar} title="Fechar">
+          <button type="button" className="modal-fechar" onClick={onFechar} title="Fechar" aria-label="Fechar">
             <X size={18} />
           </button>
         </div>

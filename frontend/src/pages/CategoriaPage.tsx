@@ -5,12 +5,18 @@ import { listarCategorias, excluirCategoria, Categoria } from "../api/categoria"
 import { ItemMenu } from "../api/menu";
 import CategoriaForm from "./CategoriaForm";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
+import ThOrdenavel from "../components/ThOrdenavel";
+import BotaoExportar from "../components/BotaoExportar";
+import SeletorItensPorPagina from "../components/SeletorItensPorPagina";
 import { obterColunasVisiveis, salvarColunasVisiveis } from "../utils/colunasVisiveis";
+import { obterItensPorPagina, salvarItensPorPagina } from "../utils/itensPorPagina";
+import { useOrdenacao, ordenarLista } from "../utils/ordenacao";
+import { colunasVisiveisParaExportacao } from "../utils/exportarCsv";
+import { useToast } from "../contexts/ToastContext";
+import { useConfirmacao } from "../contexts/ConfirmContext";
 import "./CategoriaPage.css";
 
 type SubView = "lista" | "form";
-
-const ITENS_POR_PAGINA = 15;
 
 const COLUNAS: OpcaoColuna[] = [
   { chave: "id", label: "ID" },
@@ -28,6 +34,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
   const podeAdicionar = permissoes?.adicionar ?? false;
   const podeEditar = permissoes?.editar ?? false;
   const podeExcluir = permissoes?.excluir ?? false;
+  const podeExportar = permissoes?.imprimir ?? false;
 
   const [subView, setSubView] = useState<SubView>("lista");
   const [idSelecionado, setIdSelecionado] = useState<number | null>(null);
@@ -39,6 +46,10 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
   const [colunasVisiveis, setColunasVisiveis] = useState<Set<string>>(() =>
     obterColunasVisiveis("categoria", COLUNAS_PADRAO)
   );
+  const [itensPorPagina, setItensPorPagina] = useState<number>(() => obterItensPorPagina("categoria"));
+  const { ordenacao, alternarOrdenacao } = useOrdenacao();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirmacao();
 
   function alternarColuna(chave: string) {
     setColunasVisiveis((atual) => {
@@ -48,6 +59,12 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
       salvarColunasVisiveis("categoria", novo);
       return novo;
     });
+  }
+
+  function alterarItensPorPagina(valor: number) {
+    setItensPorPagina(valor);
+    salvarItensPorPagina("categoria", valor);
+    setPagina(1);
   }
 
   async function carregar() {
@@ -71,15 +88,17 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
   }, [busca, subView]);
 
   async function handleExcluir(categoria: Categoria) {
-    if (!window.confirm(`Excluir a categoria "${categoria.DescricaoCategoria}"?`)) return;
+    if (!(await confirmar({ mensagem: `Excluir a categoria "${categoria.DescricaoCategoria}"?`, perigo: true })))
+      return;
     try {
       await excluirCategoria(categoria.IdCategoria);
       carregar();
+      mostrarToast("Categoria excluída com sucesso", "sucesso");
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        window.alert(err.response.data?.erro || "Não foi possível excluir a categoria");
+        mostrarToast(err.response.data?.erro || "Não foi possível excluir a categoria", "erro");
       } else {
-        window.alert("Não foi possível conectar ao servidor. Tente novamente.");
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
       }
     }
   }
@@ -103,9 +122,21 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
     return <CategoriaForm id={idSelecionado} onVoltar={voltarParaLista} />;
   }
 
-  const totalPaginas = Math.max(1, Math.ceil(categorias.length / ITENS_POR_PAGINA));
+  const categoriasOrdenadas = ordenarLista(categorias, ordenacao, {
+    id: (c) => c.IdCategoria,
+    descricao: (c) => c.DescricaoCategoria,
+  });
+  const colunasExportacao = colunasVisiveisParaExportacao<Categoria>(COLUNAS, colunasVisiveis, {
+    id: (c) => String(c.IdCategoria),
+    descricao: (c) => c.DescricaoCategoria,
+  });
+
+  const totalPaginas = Math.max(1, Math.ceil(categoriasOrdenadas.length / itensPorPagina));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const categoriasPagina = categorias.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+  const categoriasPagina = categoriasOrdenadas.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  );
 
   return (
     <div className="categoria-page">
@@ -114,6 +145,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
           type="button"
           className="categoria-btn-voltar"
           title="Voltar para Início"
+          aria-label="Voltar para Início"
           onClick={voltarInicio}
         >
           <ArrowLeft size={18} />
@@ -129,6 +161,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
               type="button"
               className="categoria-busca-limpar"
               title="Limpar busca"
+              aria-label="Limpar busca"
               onClick={() => setBusca("")}
             >
               <X size={14} />
@@ -138,6 +171,15 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
 
         <div className="categoria-toolbar-espaco" />
 
+        {podeExportar && (
+          <BotaoExportar
+            nomeArquivo="categorias"
+            titulo="Categorias"
+            dados={categoriasOrdenadas}
+            colunas={colunasExportacao}
+          />
+        )}
+
         {podeAdicionar && (
           <button className="categoria-btn-criar" onClick={abrirCriacao}>
             Criar Categoria
@@ -145,17 +187,25 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
         )}
       </div>
 
-      <div className="categoria-tabela-wrapper">
+      <div className={`categoria-tabela-wrapper ${carregando ? "tabela-atualizando" : ""}`}>
         <table className="categoria-tabela">
           <thead>
             <tr>
-              {colunasVisiveis.has("id") && <th>ID</th>}
-              {colunasVisiveis.has("descricao") && <th>Descrição</th>}
+              {colunasVisiveis.has("id") && (
+                <ThOrdenavel campo="id" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  ID
+                </ThOrdenavel>
+              )}
+              {colunasVisiveis.has("descricao") && (
+                <ThOrdenavel campo="descricao" ordenacao={ordenacao} onOrdenar={alternarOrdenacao}>
+                  Descrição
+                </ThOrdenavel>
+              )}
               <th className="categoria-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {carregando ? (
+            {carregando && categoriasPagina.length === 0 ? (
               <tr>
                 <td colSpan={colunasVisiveis.size + 1} className="categoria-vazio">Carregando...</td>
               </tr>
@@ -173,6 +223,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
                       <button
                         className="categoria-icone-acao editar"
                         title="Editar"
+                        aria-label="Editar"
                         onClick={() => abrirEdicao(c.IdCategoria)}
                       >
                         <Pencil size={16} />
@@ -182,6 +233,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
                       <button
                         className="categoria-icone-acao perigo"
                         title="Excluir"
+                        aria-label="Excluir"
                         onClick={() => handleExcluir(c)}
                       >
                         <Trash2 size={16} />
@@ -197,6 +249,7 @@ function CategoriaPage({ permissoes, voltarInicio }: CategoriaPageProps) {
 
       <div className="categoria-rodape">
         <span>{categorias.length} registros</span>
+        <SeletorItensPorPagina valor={itensPorPagina} onAlterar={alterarItensPorPagina} />
         <div className="categoria-paginacao">
           <button disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
             <ChevronsLeft size={16} />

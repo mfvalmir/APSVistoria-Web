@@ -1,0 +1,52 @@
+.fornecedor-modal-form {
+  border: none;
+  padding: 0;
+  gap: 16px;
+}
+
+.fornecedor-modal-acoes {
+  display: flex;
+  gap: 12px;
+}
+
+.fornecedor-modal-btn-salvar,
+.fornecedor-modal-btn-cancelar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.fornecedor-modal-btn-salvar {
+  background: #2f9e46;
+  color: #f2ede8;
+}
+
+.fornecedor-modal-btn-salvar:hover:not(:disabled) {
+  background: #278238;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.fornecedor-modal-btn-cancelar {
+  background: var(--cor-fundo-secundario);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+.fornecedor-modal-btn-cancelar:hover:not(:disabled) {
+  background: var(--cor-fundo-hover);
+}
+
+.fornecedor-modal-btn-salvar:disabled,
+.fornecedor-modal-btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
