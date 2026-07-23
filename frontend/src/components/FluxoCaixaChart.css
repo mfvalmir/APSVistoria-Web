@@ -1,19 +1,20 @@
 .fluxo-caixa-chart {
-  --cor-boa: #0ca30c;
-  --cor-critica: #d03b3b;
+  --cor-boa: #1c6fb0;
+  --cor-critica: #a33a2c;
   --ink-secondary: #52514e;
   --ink-muted: #898781;
   --gridline: #e1e0d9;
   --superficie: #fcfcfb;
   background: var(--cor-fundo-secundario);
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme="dark"] .fluxo-caixa-chart {
-  --cor-boa: #0ca30c;
-  --cor-critica: #e66767;
+  --cor-boa: #2f8fd9;
+  --cor-critica: #e0685a;
   --ink-secondary: #c3c2b7;
   --ink-muted: #898781;
   --gridline: #2c2c2a;
@@ -22,9 +23,11 @@
 
 .fluxo-caixa-titulo {
   margin: 0 0 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cor-texto-titulo);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .fluxo-caixa-area {

@@ -22,6 +22,7 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -36,20 +37,27 @@
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
 }
 
+.confirm-modal-btn-confirmar:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
 .confirm-modal-btn-confirmar.perigo {
-  background: #e02020;
+  background: var(--cor-erro);
 }
 
 .confirm-modal-btn-confirmar.perigo:hover {
-  background: #c21a1a;
+  background: #8a3125;
 }
 
 .confirm-modal-btn-cancelar {
   background: var(--cor-fundo-secundario);
   color: var(--cor-texto);
   border: 1px solid var(--cor-borda);
+  box-shadow: none;
 }
 
 .confirm-modal-btn-cancelar:hover {
   background: var(--cor-fundo-hover);
+  border-color: var(--cor-marca);
 }

@@ -37,14 +37,16 @@ function Header({
         </button>
         <img className="app-header-brand" src="/images/logo-aps-vistoria.png" alt="APS Vistoria" />
         <span className="app-header-versao">v{VERSAO_APP}</span>
-        <span className="app-header-separator">/</span>
-        {grupo && (
-          <>
-            <span className="app-header-grupo">{grupo}</span>
-            <span className="app-header-separator">/</span>
-          </>
-        )}
-        <span className="app-header-titulo">{titulo}</span>
+        <span className="app-header-divisor" aria-hidden="true" />
+        <span className="app-header-trilha">
+          {grupo && (
+            <>
+              <span className="app-header-grupo">{grupo}</span>
+              <span className="app-header-separator">›</span>
+            </>
+          )}
+          <span className="app-header-titulo">{titulo}</span>
+        </span>
       </div>
 
       <div className="app-header-right">

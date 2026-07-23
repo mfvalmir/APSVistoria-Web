@@ -22,10 +22,17 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .funcionarios-btn-voltar:hover {
   background: var(--cor-fundo-hover);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
+}
+
+.funcionarios-btn-voltar:active {
+  transform: scale(0.94);
 }
 
 .funcionarios-busca {
@@ -38,6 +45,12 @@
   padding: 8px 12px;
   min-width: 480px;
   color: var(--cor-texto-fraco);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.funcionarios-busca:focus-within {
+  border-color: var(--cor-marca);
+  box-shadow: 0 0 0 3px var(--cor-marca-fraca);
 }
 
 .funcionarios-busca input {
@@ -89,6 +102,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -106,7 +120,8 @@
 .funcionarios-tabela-wrapper {
   overflow-x: auto;
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .funcionarios-tabela {
@@ -117,11 +132,15 @@
 
 .funcionarios-tabela th {
   text-align: left;
-  padding: 12px 16px;
+  padding: 11px 16px;
   background: var(--cor-fundo-secundario);
-  color: var(--cor-texto-titulo);
-  font-weight: 600;
-  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid var(--cor-marca-media);
+  white-space: nowrap;
 }
 
 .funcionarios-tabela th.funcionarios-col-status,
@@ -130,7 +149,7 @@
 }
 
 .funcionarios-tabela td {
-  padding: 7px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
 }
@@ -143,8 +162,20 @@
   background: var(--cor-fundo-secundario);
 }
 
+.funcionarios-tabela tbody tr {
+  transition: background 0.15s ease;
+}
+
+.funcionarios-tabela tbody tr td {
+  transition: box-shadow 0.15s ease;
+}
+
 .funcionarios-tabela tbody tr:hover {
   background: var(--cor-fundo-hover);
+}
+
+.funcionarios-tabela tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--cor-marca);
 }
 
 .funcionarios-vazio {
@@ -154,12 +185,23 @@
 }
 
 .funcionarios-badge {
-  display: inline-block;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 9px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+}
+
+.funcionarios-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .funcionarios-badge.ativo {
@@ -185,42 +227,45 @@
 }
 
 .funcionarios-icone-acao {
-  border: 1px solid var(--cor-borda);
-  background: var(--cor-fundo);
+  border: none;
+  background: transparent;
   color: var(--cor-texto);
-  border-radius: 6px;
-  padding: 6px;
-  margin-right: 6px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin-right: 4px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .funcionarios-icone-acao:last-child {
   margin-right: 0;
 }
 
-.funcionarios-icone-acao:hover {
-  background: var(--cor-fundo-hover);
+.funcionarios-icone-acao:active {
+  transform: scale(0.92);
 }
 
 .funcionarios-icone-acao.editar {
   color: #c8860d;
-  border-color: #c8860d44;
+  background: #c8860d14;
 }
 
 .funcionarios-icone-acao.editar:hover {
-  background: #c8860d1a;
+  background: #c8860d26;
 }
 
 .funcionarios-icone-acao.perigo {
   color: #e02020;
-  border-color: #e0202044;
+  background: #e0202014;
 }
 
 .funcionarios-icone-acao.perigo:hover {
-  background: #e020201a;
+  background: #e0202026;
 }
 
 .funcionarios-rodape {
@@ -247,6 +292,12 @@
   font-size: 13px;
   display: inline-flex;
   align-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.funcionarios-paginacao button:not(:disabled):not(.ativa):hover {
+  background: var(--cor-fundo-hover);
+  border-color: var(--cor-marca);
 }
 
 .funcionarios-paginacao button:disabled {
@@ -258,4 +309,5 @@
   background: var(--cor-marca);
   border-color: var(--cor-marca);
   color: var(--cor-marca-texto);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }

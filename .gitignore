@@ -1,0 +1,4 @@
+.agents/
+.claude/
+skills-lock.json
+guia-deploy-cloudflare-tunnel.pdf

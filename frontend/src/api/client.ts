@@ -1,9 +1,16 @@
 import axios from "axios";
 
-// A URL da API vem da variável de ambiente VITE_API_URL.
-// Assim, ao mudar de rede interna -> internet, só troca o .env do frontend.
+// Por padrão a API é descoberta automaticamente a partir do host usado pra
+// acessar a página (mesmo hostname/IP, porta 3000). Assim o mesmo build funciona
+// tanto acessando pelo hostname do PC quanto pelo IP direto (ex: celular na rede
+// local), sem precisar fixar um endereço. VITE_API_URL continua disponível como
+// override manual para casos que fujam desse padrão (ex: produção atrás de proxy).
+const apiBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  `${window.location.protocol}//${window.location.hostname}:3000`;
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: apiBaseUrl,
 });
 
 // Token em sessionStorage (não localStorage): mantém login ao recarregar a página,

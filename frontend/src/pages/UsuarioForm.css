@@ -17,10 +17,23 @@
   padding: 8px;
   cursor: pointer;
   display: inline-flex;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.usuario-form-voltar:hover {
+  background: var(--cor-fundo-hover);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
+}
+
+.usuario-form-voltar:active {
+  transform: scale(0.94);
 }
 
 .usuario-form-cabecalho h2 {
   margin: 0;
+  font-size: 19px;
+  font-weight: 700;
   color: var(--cor-texto-titulo);
 }
 
@@ -29,9 +42,11 @@
   flex-direction: column;
   gap: 18px;
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-top: 3px solid var(--cor-marca-media);
+  border-radius: 12px;
   padding: 24px;
   background: var(--cor-fundo-secundario);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .usuario-form-linha {
@@ -55,8 +70,11 @@
 }
 
 .usuario-form-campo label {
-  font-size: 13px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .obrigatorio {
@@ -72,11 +90,13 @@
   color: var(--cor-texto);
   font-size: 14px;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .usuario-form-campo input:focus,
 .usuario-form-campo select:focus {
   border-color: var(--cor-marca);
+  box-shadow: 0 0 0 3px var(--cor-marca-fraca);
 }
 
 .usuario-form-campo input:disabled {
@@ -86,6 +106,11 @@
 .usuario-form-campo.campo-invalido input,
 .usuario-form-campo.campo-invalido select {
   border-color: var(--cor-erro);
+}
+
+.usuario-form-campo.campo-invalido input:focus,
+.usuario-form-campo.campo-invalido select:focus {
+  box-shadow: 0 0 0 3px #a33a2c22;
 }
 
 .usuario-form-campo-erro {
@@ -110,17 +135,16 @@
   align-items: center;
   justify-content: center;
   width: 40px;
-  border: 1px solid var(--cor-borda-input);
-  background: var(--cor-fundo);
-  color: var(--cor-texto-fraco);
+  border: none;
+  background: var(--cor-marca-fraca);
+  color: var(--cor-marca);
   border-radius: 8px;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .usuario-form-btn-navegar:hover {
-  background: var(--cor-fundo-hover);
-  color: var(--cor-marca);
-  border-color: var(--cor-marca);
+  background: var(--cor-marca-media);
 }
 
 .usuario-form-senha-wrapper {
@@ -135,7 +159,7 @@
 
 .usuario-form-senha-wrapper button {
   position: absolute;
-  right: 8px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
@@ -143,6 +167,14 @@
   color: var(--cor-texto-fraco);
   cursor: pointer;
   display: inline-flex;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.usuario-form-senha-wrapper button:hover {
+  background: var(--cor-fundo-hover);
+  color: var(--cor-marca);
 }
 
 .usuario-form-combobox .usuario-form-sugestoes {
@@ -154,6 +186,7 @@
   background: var(--cor-fundo);
   border: 1px solid var(--cor-borda);
   border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   max-height: 200px;
   overflow-y: auto;
   list-style: none;
@@ -167,25 +200,30 @@
   cursor: pointer;
   font-size: 14px;
   color: var(--cor-texto);
+  transition: background 0.1s ease;
 }
 
 .usuario-form-sugestoes li:hover {
-  background: var(--cor-fundo-hover);
+  background: var(--cor-marca-fraca);
+  color: var(--cor-marca);
 }
 
 .usuario-form-permissoes {
   border: 1px solid var(--cor-borda);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 20px;
+  background: var(--cor-fundo);
 }
 
 .usuario-form-permissoes-titulo {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cor-texto-titulo);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .usuario-form-toggle {
@@ -214,10 +252,13 @@
   padding: 10px 14px;
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .usuario-form-btn-alterar-senha:hover {
-  background: var(--cor-fundo-hover);
+  background: var(--cor-marca-fraca);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
 }
 
 .usuario-form-btn-salvar {
@@ -233,6 +274,7 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 

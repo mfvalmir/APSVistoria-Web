@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { isAxiosError } from "axios";
+import { Eye, EyeOff } from "lucide-react";
 import { login } from "../api/auth";
 import "./Login.css";
 
@@ -10,12 +11,14 @@ interface LoginProps {
 function Login({ onLoginSuccess }: LoginProps) {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
 
   function limparFormulario() {
     setUsuario("");
     setSenha("");
+    setMostrarSenha(false);
     setErro("");
   }
 
@@ -80,13 +83,23 @@ function Login({ onLoginSuccess }: LoginProps) {
 
           <div className="login-field">
             <label htmlFor="login-senha">Senha</label>
-            <input
-              id="login-senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-            />
+            <div className="login-senha-wrapper">
+              <input
+                id="login-senha"
+                type={mostrarSenha ? "text" : "password"}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarSenha((v) => !v)}
+                title={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {erro && <div className="login-error">{erro}</div>}

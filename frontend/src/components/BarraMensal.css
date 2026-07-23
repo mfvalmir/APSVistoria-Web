@@ -7,8 +7,9 @@
   --gridline: #e1e0d9;
   background: var(--cor-fundo-secundario);
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   flex: 1;
   min-width: 220px;
 }
@@ -16,7 +17,7 @@
 :root[data-theme="dark"] .barra-mensal {
   --seq-1: #3987e5;
   --seq-2: #199e70;
-  --seq-3: #d99a3f;
+  --seq-3: #b8791f;
   --ink-secondary: #c3c2b7;
   --ink-muted: #898781;
   --gridline: #2c2c2a;
@@ -24,9 +25,11 @@
 
 .barra-mensal-titulo {
   margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cor-texto-titulo);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .barra-mensal-area {

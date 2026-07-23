@@ -17,6 +17,8 @@
 }
 
 .inicio-kpi {
+  position: relative;
+  overflow: hidden;
   flex: 1;
   min-width: 220px;
   display: flex;
@@ -24,8 +26,34 @@
   gap: 14px;
   background: var(--cor-fundo-secundario);
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 17px 18px 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.inicio-kpi::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.inicio-kpi-caixa::before {
+  background: var(--cor-marca);
+}
+
+.inicio-kpi-receber::before {
+  background: #1c6fb0;
+}
+
+.inicio-kpi-pagar::before {
+  background: var(--cor-erro);
+}
+
+.inicio-kpi-vistoria::before {
+  background: #2a78d6;
 }
 
 .inicio-kpi-icone {
@@ -39,17 +67,17 @@
 }
 
 .inicio-kpi-icone-caixa {
-  background: #6b4a3a22;
+  background: var(--cor-marca-fraca);
   color: var(--cor-marca);
 }
 
 .inicio-kpi-icone-receber {
-  background: #0ca30c22;
-  color: #0ca30c;
+  background: #1c6fb022;
+  color: #1c6fb0;
 }
 
 .inicio-kpi-icone-pagar {
-  background: #d03b3b22;
+  background: #a33a2c1c;
   color: var(--cor-erro);
 }
 
@@ -66,15 +94,19 @@
 }
 
 .inicio-kpi-label {
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .inicio-kpi-valor {
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--cor-texto-titulo);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .inicio-kpi-nota {
@@ -88,22 +120,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cor-borda);
-  background: var(--cor-fundo);
-  color: var(--cor-texto);
-  border-radius: 6px;
-  padding: 6px;
+  border: none;
+  background: var(--cor-marca-fraca);
+  color: var(--cor-marca);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .inicio-kpi-btn-imprimir:hover:not(:disabled) {
-  background: var(--cor-fundo-secundario);
-  border-color: var(--cor-marca);
-  color: var(--cor-marca);
+  background: var(--cor-marca-media);
+}
+
+.inicio-kpi-btn-imprimir:active:not(:disabled) {
+  transform: scale(0.92);
 }
 
 .inicio-kpi-btn-imprimir:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -118,7 +155,7 @@
 .inicio-alertas {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   /* Mesma largura de 1 dos 4 cards de .inicio-kpis (ex.: "Saldo em Caixa"): 3 gaps de 16px
      divididos entre as 4 colunas daquela linha, mesmo container de largura total. */
   flex: 0 0 calc((100% - 48px) / 4);
@@ -130,19 +167,22 @@
   align-items: center;
   gap: 12px;
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 13px 15px;
   font-size: 13px;
   color: var(--cor-texto);
+  transition: opacity 0.15s ease;
 }
 
 .inicio-alerta strong {
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
 }
 
 .inicio-alerta-valor {
   display: block;
   font-size: 12px;
   color: var(--cor-texto-fraco);
+  font-variant-numeric: tabular-nums;
 }
 
 .inicio-alerta-linha {
@@ -160,23 +200,23 @@
 }
 
 .inicio-alerta-critica {
-  background: #d03b3b1a;
+  background: #a33a2c14;
   color: var(--cor-erro);
-  border: 1px solid #d03b3b33;
+  border: 1px solid #a33a2c33;
 }
 
 .inicio-alerta-aviso {
-  background: #fab2191a;
+  background: #c8860d14;
   color: #a06b00;
-  border: 1px solid #fab21944;
+  border: 1px solid #c8860d3d;
 }
 
 :root[data-theme="dark"] .inicio-alerta-aviso {
-  color: #fab219;
+  color: #e0a83a;
 }
 
 .inicio-alerta-vazia {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .inicio-alertas-cabecalho {
@@ -188,9 +228,11 @@
 
 .inicio-alertas-titulo {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cor-texto-titulo);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .inicio-alertas-btn-imprimir {
@@ -198,22 +240,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cor-borda);
-  background: var(--cor-fundo);
-  color: var(--cor-texto);
-  border-radius: 6px;
-  padding: 6px;
+  border: none;
+  background: var(--cor-marca-fraca);
+  color: var(--cor-marca);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .inicio-alertas-btn-imprimir:hover:not(:disabled) {
-  background: var(--cor-fundo-secundario);
-  border-color: var(--cor-marca);
-  color: var(--cor-marca);
+  background: var(--cor-marca-media);
 }
 
 .inicio-alertas-btn-imprimir:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -222,15 +265,18 @@
   min-width: 320px;
   background: var(--cor-fundo-secundario);
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .inicio-proximos-titulo {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cor-texto-titulo);
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .inicio-proximos-vazio {
@@ -246,13 +292,21 @@
 }
 
 .inicio-proximos-tabela td {
-  padding: 8px 6px;
+  padding: 9px 6px;
   border-bottom: 1px solid var(--cor-borda);
   color: var(--cor-texto);
 }
 
 .inicio-proximos-tabela tr:last-child td {
   border-bottom: none;
+}
+
+.inicio-proximos-tabela tr {
+  transition: background 0.15s ease;
+}
+
+.inicio-proximos-tabela tr:hover {
+  background: var(--cor-fundo-hover);
 }
 
 .inicio-proximos-descricao {
@@ -266,25 +320,37 @@
 .inicio-proximos-valor {
   white-space: nowrap;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .inicio-badge-tipo {
-  display: inline-block;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
+.inicio-badge-tipo::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
 .inicio-badge-tipo.pagar {
-  background: #d03b3b22;
+  background: #a33a2c1c;
   color: var(--cor-erro);
 }
 
 .inicio-badge-tipo.receber {
-  background: #0ca30c22;
-  color: #0ca30c;
+  background: #1c6fb022;
+  color: #1c6fb0;
 }
 
 /* Gráficos */

@@ -1,23 +1,46 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(26, 20, 16, 0.55);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
   padding: 16px;
+  animation: modal-overlay-entrar 0.15s ease;
+}
+
+@keyframes modal-overlay-entrar {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-painel {
   background: var(--cor-fundo);
   border: 1px solid var(--cor-borda);
-  border-radius: 12px;
+  border-radius: 14px;
   width: 100%;
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
+  animation: modal-painel-entrar 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-painel-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-cabecalho {
@@ -26,31 +49,42 @@
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  background: var(--cor-marca);
+  background: linear-gradient(180deg, var(--cor-marca) 0%, var(--cor-marca-hover) 100%);
   color: var(--cor-marca-texto);
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px 14px 0 0;
   position: sticky;
   top: 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .modal-cabecalho h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16.5px;
+  font-weight: 700;
 }
 
 .modal-fechar {
   border: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.12);
   color: var(--cor-marca-texto);
   cursor: pointer;
   display: inline-flex;
-  padding: 4px;
-  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
   flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .modal-fechar:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.modal-fechar:active {
+  transform: scale(0.9);
 }
 
 .modal-corpo {

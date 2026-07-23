@@ -125,7 +125,7 @@ function Inicio() {
   return (
     <div className="inicio-pagina">
       <div className="inicio-kpis">
-        <div className="inicio-kpi">
+        <div className="inicio-kpi inicio-kpi-caixa">
           <div className="inicio-kpi-icone inicio-kpi-icone-caixa">
             <Wallet size={20} />
           </div>
@@ -138,7 +138,7 @@ function Inicio() {
           </div>
         </div>
 
-        <div className="inicio-kpi">
+        <div className="inicio-kpi inicio-kpi-receber">
           <div className="inicio-kpi-icone inicio-kpi-icone-receber">
             <ArrowUpCircle size={20} />
           </div>
@@ -162,7 +162,7 @@ function Inicio() {
           </button>
         </div>
 
-        <div className="inicio-kpi">
+        <div className="inicio-kpi inicio-kpi-pagar">
           <div className="inicio-kpi-icone inicio-kpi-icone-pagar">
             <ArrowDownCircle size={20} />
           </div>
@@ -184,7 +184,7 @@ function Inicio() {
           </button>
         </div>
 
-        <div className="inicio-kpi">
+        <div className="inicio-kpi inicio-kpi-vistoria">
           <div className="inicio-kpi-icone inicio-kpi-icone-vistoria">
             <ClipboardCheck size={20} />
           </div>

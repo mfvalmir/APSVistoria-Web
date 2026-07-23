@@ -6,10 +6,12 @@
   --cor-marca: #6b4a3a;
   --cor-marca-hover: #5c3e30;
   --cor-marca-texto: #f2ede8;
-  --cor-fundo: #fdfcfb;
-  --cor-fundo-secundario: #f5f2ef;
-  --cor-fundo-hover: #ece5de;
-  --cor-borda: #ddd6cf;
+  --cor-marca-fraca: #6b4a3a14;
+  --cor-marca-media: #6b4a3a33;
+  --cor-fundo: #f2efeb;
+  --cor-fundo-secundario: #e9e4de;
+  --cor-fundo-hover: #ded5cb;
+  --cor-borda: #cfc6bc;
   --cor-borda-input: #b9b3ac;
   --cor-texto: #4a4a4a;
   --cor-texto-titulo: #5a5a5a;
@@ -21,6 +23,8 @@
   --cor-marca: #8a6a58;
   --cor-marca-hover: #9c7a66;
   --cor-marca-texto: #f2ede8;
+  --cor-marca-fraca: #8a6a581f;
+  --cor-marca-media: #8a6a5840;
   --cor-fundo: #1c1917;
   --cor-fundo-secundario: #262220;
   --cor-fundo-hover: #322c28;

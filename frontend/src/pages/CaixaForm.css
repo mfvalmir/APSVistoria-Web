@@ -8,10 +8,12 @@
   font-family: inherit;
   outline: none;
   resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .caixa-form-textarea:focus {
   border-color: var(--cor-marca);
+  box-shadow: 0 0 0 3px var(--cor-marca-fraca);
 }
 
 .caixa-form-textarea-auto {
@@ -35,13 +37,24 @@
 }
 
 .caixa-form-badge {
-  display: inline-block;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 9px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.03em;
   margin-left: 4px;
+}
+
+.caixa-form-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .caixa-form-badge.aberto {
@@ -72,11 +85,15 @@
   cursor: pointer;
   background: transparent;
   color: var(--cor-erro);
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .caixa-form-btn-fechar:hover:not(:disabled) {
-  background: #e0202015;
+  background: #a33a2c14;
+}
+
+.caixa-form-btn-fechar:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .caixa-form-btn-fechar:disabled {
@@ -116,9 +133,12 @@ table.caixa-form-movimentos-tabela th {
   text-align: left;
   padding: 8px 10px;
   background: var(--cor-fundo-secundario);
-  color: var(--cor-texto-titulo);
-  font-weight: 600;
-  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--cor-marca-media);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -182,11 +202,7 @@ table.caixa-form-movimentos-tabela tbody tr:nth-child(even) {
 }
 
 table.caixa-form-movimentos-tabela tbody tr:hover td {
-  background: #cfe0f2;
-}
-
-:root[data-theme="dark"] table.caixa-form-movimentos-tabela tbody tr:hover td {
-  background: #2c3540;
+  background: var(--cor-marca-media);
 }
 
 table.caixa-form-movimentos-tabela td.caixa-form-movimentos-descricao {
@@ -202,11 +218,22 @@ table.caixa-form-movimentos-tabela td.caixa-form-movimentos-descricao {
 }
 
 .caixa-badge-tipo {
-  display: inline-block;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
+}
+
+.caixa-badge-tipo::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .caixa-badge-tipo.entrada {

@@ -48,10 +48,13 @@
   padding: 10px 14px;
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .vistoria-form-btn-recibo-avista:hover:not(:disabled) {
-  background: var(--cor-fundo-hover);
+  background: var(--cor-marca-fraca);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
 }
 
 .vistoria-form-btn-recibo-avista:disabled {

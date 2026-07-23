@@ -8,10 +8,12 @@
   font-family: inherit;
   outline: none;
   resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cliente-form-textarea:focus {
   border-color: var(--cor-marca);
+  box-shadow: 0 0 0 3px var(--cor-marca-fraca);
 }
 
 .cliente-form-campo-documento {
@@ -22,9 +24,10 @@
 .cliente-form-acao-salvar {
   margin-top: 20px;
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 24px;
   background: var(--cor-fundo-secundario);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .cliente-form-acao-salvar .usuario-form-btn-salvar {
@@ -44,9 +47,10 @@
 .cliente-responsaveis {
   margin-top: 20px;
   border: 1px solid var(--cor-borda);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 20px;
   background: var(--cor-fundo-secundario);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .cliente-responsaveis-cabecalho {
@@ -58,8 +62,11 @@
 
 .cliente-responsaveis-cabecalho h3 {
   margin: 0;
-  font-size: 15px;
-  color: var(--cor-texto-titulo);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cor-texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .cliente-responsaveis-btn-adicionar {
@@ -74,6 +81,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -118,10 +126,12 @@
   padding: 10px 16px;
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .cliente-responsaveis-btn-cancelar:hover {
   background: var(--cor-fundo-hover);
+  border-color: var(--cor-marca);
 }
 
 .cliente-responsaveis-vazio {
@@ -145,9 +155,12 @@
   text-align: left;
   padding: 10px 14px;
   background: var(--cor-fundo);
-  color: var(--cor-texto-titulo);
-  font-weight: 600;
-  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto-fraco);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--cor-marca-media);
 }
 
 .cliente-responsaveis-tabela th.cliente-responsaveis-col-acoes {
@@ -164,6 +177,10 @@
   border-bottom: none;
 }
 
+.cliente-responsaveis-tabela tbody tr {
+  transition: background 0.15s ease;
+}
+
 .cliente-responsaveis-tabela tbody tr:hover {
   background: var(--cor-fundo-hover);
 }
@@ -177,40 +194,43 @@
 }
 
 .cliente-responsaveis-icone-acao {
-  border: 1px solid var(--cor-borda);
-  background: var(--cor-fundo);
+  border: none;
+  background: transparent;
   color: var(--cor-texto);
-  border-radius: 6px;
-  padding: 6px;
-  margin-right: 6px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin-right: 4px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .cliente-responsaveis-icone-acao:last-child {
   margin-right: 0;
 }
 
-.cliente-responsaveis-icone-acao:hover {
-  background: var(--cor-fundo-hover);
+.cliente-responsaveis-icone-acao:active {
+  transform: scale(0.92);
 }
 
 .cliente-responsaveis-icone-acao.editar {
   color: #c8860d;
-  border-color: #c8860d44;
+  background: #c8860d14;
 }
 
 .cliente-responsaveis-icone-acao.editar:hover {
-  background: #c8860d1a;
+  background: #c8860d26;
 }
 
 .cliente-responsaveis-icone-acao.perigo {
   color: #e02020;
-  border-color: #e0202044;
+  background: #e0202014;
 }
 
 .cliente-responsaveis-icone-acao.perigo:hover {
-  background: #e020201a;
+  background: #e0202026;
 }

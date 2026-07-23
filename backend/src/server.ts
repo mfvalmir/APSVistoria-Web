@@ -29,15 +29,24 @@ const app = express();
 
 app.use(express.json());
 
-// CORS restrito às origens definidas no .env (aceita lista separada por vírgula,
-// útil pra liberar localhost + o IP da rede interna ao mesmo tempo, ex. teste no celular).
+// CORS aceita as origens fixas do .env (localhost, hostname do PC) e, além disso,
+// qualquer IP de rede privada (192.168.x.x, 10.x.x.x, 172.16-31.x.x) em qualquer porta
+// - assim celular/outros dispositivos na mesma rede acessam sem precisar cadastrar
+// cada IP manualmente (e sem quebrar quando o DHCP troca o IP da máquina).
 const corsOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((origem) => origem.trim())
   .filter(Boolean);
+const redePrivadaRegex =
+  /^https?:\/\/(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})(:\d+)?$/;
 app.use(
   cors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.includes(origin) || redePrivadaRegex.test(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error("Origem não permitida pelo CORS"));
+    },
   })
 );
 
