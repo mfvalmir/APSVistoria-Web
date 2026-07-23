@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import fs from "fs";
 import "dotenv/config";
 import usuariosRouter from "./routes/usuarios";
 import authRouter from "./routes/auth";
@@ -27,11 +29,15 @@ const app = express();
 
 app.use(express.json());
 
-// CORS restrito à origem definida no .env.
-// Hoje (rede interna) aponta pro IP do frontend; na internet, vira o domínio real.
+// CORS restrito às origens definidas no .env (aceita lista separada por vírgula,
+// útil pra liberar localhost + o IP da rede interna ao mesmo tempo, ex. teste no celular).
+const corsOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origem) => origem.trim())
+  .filter(Boolean);
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: corsOrigins,
   })
 );
 
@@ -60,6 +66,17 @@ app.use("/vistoria", vistoriaRouter);
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", banco: process.env.DB_NAME });
 });
+
+// Serve o build do frontend (frontend/dist) quando presente, permitindo que
+// backend e frontend rodem sob a mesma origem/porta em produção (sem CORS).
+// Em dev (sem build gerado) essa parte simplesmente não é ativada.
+const frontendDistPath = path.join(__dirname, "../../frontend/dist");
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+}
 
 const PORT = process.env.PORT || 3000;
 

@@ -218,8 +218,22 @@ async function construirRecibo(dados: DadosRecibo): Promise<jsPDF> {
   return doc;
 }
 
+// Lançado quando não há valor pago a comprovar - parcela com ValorPago zerado (pagamento tipo
+// Retorno/Cortesia, que não gera entrada de caixa) ou qualquer outro caso sem entrada real.
+export class ReciboValorZeroError extends Error {
+  constructor() {
+    super(
+      "Não é possível emitir recibo de valor R$ 0,00 — não há entrada de pagamento (pode ser um lançamento do tipo Retorno ou Cortesia)."
+    );
+    this.name = "ReciboValorZeroError";
+  }
+}
+
 // Gera o PDF e abre em uma nova aba para visualização, sem forçar o download.
 export async function visualizarRecibo(dados: DadosRecibo): Promise<void> {
+  if (!dados.valor || dados.valor <= 0) {
+    throw new ReciboValorZeroError();
+  }
   const doc = await construirRecibo(dados);
   const url = URL.createObjectURL(doc.output("blob"));
   window.open(url, "_blank");

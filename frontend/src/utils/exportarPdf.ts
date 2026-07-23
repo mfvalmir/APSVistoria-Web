@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ColunaExportacao } from "./exportarCsv";
+import { adicionarRodapePaginas } from "./pdfPaginacao";
 
 // Marrom da marca (--cor-marca), fixo aqui porque o PDF não tem acesso às variáveis CSS.
 const COR_CABECALHO: [number, number, number] = [107, 74, 58];
@@ -23,5 +24,6 @@ export function exportarPdf<T>(nomeArquivo: string, titulo: string, dados: T[], 
     alternateRowStyles: { fillColor: [245, 242, 239] },
   });
 
+  adicionarRodapePaginas(doc);
   doc.save(`${nomeArquivo}.pdf`);
 }

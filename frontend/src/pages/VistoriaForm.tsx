@@ -10,7 +10,7 @@ import { listarServicos, Servico } from "../api/servico";
 import { listarTiposPagamento, TipoPagamento, ehTipoRetornoOuCortesia } from "../api/tipoPagamento";
 import { validarCPF, validarCNPJ } from "../utils/documento";
 import { focarProximoCampoAoEnter } from "../utils/form";
-import { visualizarRecibo } from "../utils/recibo";
+import { visualizarRecibo, ReciboValorZeroError } from "../utils/recibo";
 import { ItemMenu } from "../api/menu";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
@@ -446,8 +446,12 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
         referente: `à parcela nº ${pad3(p.NumeroParcela)}/${pad3(parcelas.length)} da Vistoria nº ${id} - Veículo placa ${placaVeiculo} - Serviço: ${nomeServico}`,
         observacao: p.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoRecibo(null);
     }
@@ -505,8 +509,12 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
 
     try {
       await visualizarRecibo(dadosReciboAVista(vistoriaCriada));
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     }
   }
 
@@ -534,8 +542,12 @@ function VistoriaForm({ id, onVoltar, navegarPara, permissoes }: VistoriaFormPro
           TotalParcelas: Number(totalParcelas),
         })
       );
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoReciboAVista(false);
     }

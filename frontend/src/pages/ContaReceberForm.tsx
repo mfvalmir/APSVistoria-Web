@@ -12,7 +12,7 @@ import { listarClientes, obterCliente, Cliente } from "../api/clientes";
 import { listarCategorias, Categoria } from "../api/categoria";
 import { listarTiposPagamentoPadrao, TipoPagamento } from "../api/tipoPagamento";
 import { focarProximoCampoAoEnter } from "../utils/form";
-import { visualizarRecibo } from "../utils/recibo";
+import { visualizarRecibo, ReciboValorZeroError } from "../utils/recibo";
 import { ItemMenu } from "../api/menu";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
@@ -196,8 +196,12 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
         }`,
         observacao: p.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoRecibo(null);
     }
@@ -243,8 +247,12 @@ function ContaReceberForm({ id, onVoltar, navegarPara, permissoes }: ContaRecebe
         }`,
         observacao: parcelaAVista.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     }
   }
 

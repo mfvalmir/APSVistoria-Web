@@ -8,6 +8,9 @@ interface OpcoesConfirmacao {
   textoConfirmar?: string;
   textoCancelar?: string;
   perigo?: boolean;
+  // Modo aviso: some com o botão de cancelar, sobra só um "OK" - para mensagens informativas
+  // que não representam de fato uma escolha (ex.: recibo que não pôde ser emitido).
+  apenasOk?: boolean;
 }
 
 type EntradaConfirmacao = string | OpcoesConfirmacao;
@@ -47,11 +50,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               onClick={() => responder(true)}
               autoFocus
             >
-              {pedido.opcoes.textoConfirmar || "Confirmar"}
+              {pedido.opcoes.textoConfirmar || (pedido.opcoes.apenasOk ? "OK" : "Confirmar")}
             </button>
-            <button type="button" className="confirm-modal-btn-cancelar" onClick={() => responder(false)}>
-              {pedido.opcoes.textoCancelar || "Cancelar"}
-            </button>
+            {!pedido.opcoes.apenasOk && (
+              <button type="button" className="confirm-modal-btn-cancelar" onClick={() => responder(false)}>
+                {pedido.opcoes.textoCancelar || "Cancelar"}
+              </button>
+            )}
           </div>
         </Modal>
       )}

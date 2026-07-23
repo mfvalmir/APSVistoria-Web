@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Caixa, MovimentoCaixa, ORIGEM_MOVIMENTO } from "../api/caixa";
+import { adicionarRodapePaginas } from "./pdfPaginacao";
 
 // Mesma cor de marca usada em exportarPdf.ts (o PDF não tem acesso às variáveis CSS).
 const COR_CABECALHO: [number, number, number] = [107, 74, 58];
@@ -83,5 +84,6 @@ export function gerarExtratoCaixa(caixa: Caixa, movimentos: MovimentoCaixa[]): v
     alternateRowStyles: { fillColor: [245, 242, 239] },
   });
 
+  adicionarRodapePaginas(doc);
   doc.save(`caixa-${pad6(caixa.idCaixa)}-extrato.pdf`);
 }

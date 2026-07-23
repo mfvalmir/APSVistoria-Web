@@ -49,6 +49,7 @@ router.get("/", authMiddleware, async (_req, res) => {
       fluxoCaixaResult,
       vistoriasPorMesResult,
       tiposPagamentoResult,
+      rankingVistoriadoresResult,
     ] = await Promise.all([
       pool
         .request()
@@ -135,6 +136,17 @@ router.get("/", authMiddleware, async (_req, res) => {
            GROUP BY tp.TipoPagamento
            ORDER BY SUM(m.Valor) DESC`
         ),
+      pool
+        .request()
+        .query(
+          `SELECT TOP 10 fv.IdFuncionario AS idVistoriador, fv.NomeFuncionario AS nome,
+                  COUNT(*) AS quantidade, ISNULL(SUM(v.ValorTotalServico), 0) AS faturamento
+           FROM Vistoria v
+           JOIN Funcionario fv ON fv.IdFuncionario = v.idVistoriador
+           WHERE YEAR(v.DataEmissao) = YEAR(GETDATE()) AND MONTH(v.DataEmissao) = MONTH(GETDATE())
+           GROUP BY fv.IdFuncionario, fv.NomeFuncionario
+           ORDER BY COUNT(*) DESC`
+        ),
     ]);
 
     const caixa = caixaResult.recordset[0];
@@ -185,12 +197,24 @@ router.get("/", authMiddleware, async (_req, res) => {
       },
       alertas: {
         vencidas: {
-          quantidade: (vPagar.vencidasQtd || 0) + (vReceber.vencidasQtd || 0),
-          valor: Number(vPagar.vencidasValor || 0) + Number(vReceber.vencidasValor || 0),
+          pagar: {
+            quantidade: vPagar.vencidasQtd || 0,
+            valor: Number(vPagar.vencidasValor || 0),
+          },
+          receber: {
+            quantidade: vReceber.vencidasQtd || 0,
+            valor: Number(vReceber.vencidasValor || 0),
+          },
         },
         vencendoEm7Dias: {
-          quantidade: (vPagar.vencendoQtd || 0) + (vReceber.vencendoQtd || 0),
-          valor: Number(vPagar.vencendoValor || 0) + Number(vReceber.vencendoValor || 0),
+          pagar: {
+            quantidade: vPagar.vencendoQtd || 0,
+            valor: Number(vPagar.vencendoValor || 0),
+          },
+          receber: {
+            quantidade: vReceber.vencendoQtd || 0,
+            valor: Number(vReceber.vencendoValor || 0),
+          },
         },
         proximosVencimentos: proximosVencimentosResult.recordset.map((r) => ({
           tipo: r.tipo,
@@ -209,10 +233,159 @@ router.get("/", authMiddleware, async (_req, res) => {
         quantidade: r.quantidade,
         valor: Number(r.valor),
       })),
+      rankingVistoriadores: rankingVistoriadoresResult.recordset.map((r) => ({
+        idVistoriador: r.idVistoriador,
+        nome: r.nome,
+        quantidade: r.quantidade,
+        faturamento: Number(r.faturamento),
+      })),
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro ao carregar dashboard" });
+  }
+});
+
+// GET /dashboard/vistoriadores-detalhado - lista (não agregada) das vistorias do mês atual,
+// usada pelo botão de relatório do card de ranking para montar o PDF agrupado por vistoriador.
+router.get("/vistoriadores-detalhado", authMiddleware, async (_req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request().query(
+      `SELECT v.idVistoria, v.DataEmissao, v.PlacaVeiculo, v.ValorTotalServico,
+              cli.NomeCliente, s.DescricaoServico,
+              v.idVistoriador, fv.NomeFuncionario AS NomeVistoriador
+       FROM Vistoria v
+       LEFT JOIN Cliente cli ON cli.idCliente = v.idCliente
+       LEFT JOIN Servico s ON s.idServico = v.idServico
+       LEFT JOIN Funcionario fv ON fv.IdFuncionario = v.idVistoriador
+       WHERE YEAR(v.DataEmissao) = YEAR(GETDATE()) AND MONTH(v.DataEmissao) = MONTH(GETDATE())
+       ORDER BY fv.NomeFuncionario, v.DataEmissao`
+    );
+    res.json(
+      result.recordset.map((r) => ({
+        idVistoria: r.idVistoria,
+        dataEmissao: r.DataEmissao,
+        placaVeiculo: r.PlacaVeiculo,
+        valorTotalServico: Number(r.ValorTotalServico),
+        nomeCliente: r.NomeCliente,
+        descricaoServico: r.DescricaoServico,
+        idVistoriador: r.idVistoriador,
+        nomeVistoriador: r.NomeVistoriador,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: "Erro ao buscar detalhamento de vistorias por vistoriador" });
+  }
+});
+
+function condicaoDataParcela(filtro: "vencidas" | "vencendo7dias"): string {
+  return filtro === "vencidas"
+    ? "p.DataVencimento < CAST(GETDATE() AS DATE)"
+    : "p.DataVencimento BETWEEN CAST(GETDATE() AS DATE) AND DATEADD(DAY, 7, CAST(GETDATE() AS DATE))";
+}
+
+function queryParcelasPagar(filtro: "vencidas" | "vencendo7dias"): string {
+  return `SELECT p.IdContaPagarParcela AS IdParcela, p.IdContaPagar AS IdConta, p.NumeroParcela,
+                 p.DataVencimento, p.ValorParcela,
+                 DATEDIFF(DAY, p.DataVencimento, CAST(GETDATE() AS DATE)) AS DiasEmAtraso,
+                 cp.Descricao AS DescricaoConta, f.RazaoSocial AS Contraparte
+          FROM ContaPagarParcela p
+          JOIN ContaPagar cp ON cp.idContaPagar = p.IdContaPagar
+          LEFT JOIN Fornecedor f ON f.idFornecedor = cp.idFornecedor
+          WHERE p.IdStatusParcela = 0 AND ${condicaoDataParcela(filtro)}
+          ORDER BY p.DataVencimento ASC`;
+}
+
+function queryParcelasReceber(filtro: "vencidas" | "vencendo7dias"): string {
+  return `SELECT p.IdContaReceberParcela AS IdParcela, p.IdContaReceber AS IdConta, p.NumeroParcela,
+                 p.DataVencimento, p.ValorParcela,
+                 DATEDIFF(DAY, p.DataVencimento, CAST(GETDATE() AS DATE)) AS DiasEmAtraso,
+                 cr.Descricao AS DescricaoConta, c.NomeCliente AS Contraparte
+          FROM ContaReceberParcela p
+          JOIN ContaReceber cr ON cr.IdContaReceber = p.IdContaReceber
+          LEFT JOIN Cliente c ON c.idCliente = cr.idCliente
+          WHERE p.IdStatusParcela = 0 AND ${condicaoDataParcela(filtro)}
+          ORDER BY p.DataVencimento ASC`;
+}
+
+function mapearParcelas(recordset: any[]) {
+  return recordset.map((r) => ({
+    idParcela: r.IdParcela,
+    idConta: r.IdConta,
+    numeroParcela: r.NumeroParcela,
+    dataVencimento: r.DataVencimento,
+    valorParcela: Number(r.ValorParcela),
+    diasEmAtraso: r.DiasEmAtraso,
+    descricaoConta: r.DescricaoConta,
+    contraparte: r.Contraparte,
+  }));
+}
+
+// GET /dashboard/parcelas-alertas-detalhado - lista (não agregada), em uma única resposta, as
+// parcelas por trás dos 4 cards de alerta (Vencidas/Vencendo em 7 dias, Pagar/Receber). O botão
+// único de relatório do dashboard usa isso para montar um único PDF, com uma seção por
+// categoria que tiver parcela (categorias vazias são puladas na hora de montar o PDF).
+router.get("/parcelas-alertas-detalhado", authMiddleware, async (_req, res) => {
+  try {
+    const pool = await getPool();
+    const [pagarVencidas, receberVencidas, pagarVencendo, receberVencendo] = await Promise.all([
+      pool.request().query(queryParcelasPagar("vencidas")),
+      pool.request().query(queryParcelasReceber("vencidas")),
+      pool.request().query(queryParcelasPagar("vencendo7dias")),
+      pool.request().query(queryParcelasReceber("vencendo7dias")),
+    ]);
+
+    res.json({
+      pagarVencidas: mapearParcelas(pagarVencidas.recordset),
+      receberVencidas: mapearParcelas(receberVencidas.recordset),
+      pagarVencendo7Dias: mapearParcelas(pagarVencendo.recordset),
+      receberVencendo7Dias: mapearParcelas(receberVencendo.recordset),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: "Erro ao buscar parcelas em aberto" });
+  }
+});
+
+// GET /dashboard/contas-abertas-detalhado?tipo=pagar|receber - lista (não agregada) das contas
+// em aberto (Pendente/Parcial) por trás dos KPIs "A Pagar/A Receber em aberto".
+router.get("/contas-abertas-detalhado", authMiddleware, async (req, res) => {
+  const tipo = req.query.tipo === "pagar" ? "pagar" : "receber";
+
+  try {
+    const pool = await getPool();
+    const query =
+      tipo === "pagar"
+        ? `SELECT cp.idContaPagar AS IdConta, cp.NumeroDocumento, cp.Descricao, cp.DataEmissao,
+                  cp.SaldoDevedor, cp.IdStatusContaPagar AS IdStatus, f.RazaoSocial AS Contraparte
+           FROM ContaPagar cp
+           LEFT JOIN Fornecedor f ON f.idFornecedor = cp.idFornecedor
+           WHERE cp.IdStatusContaPagar IN ${STATUS_EM_ABERTO}
+           ORDER BY cp.DataEmissao ASC`
+        : `SELECT cr.IdContaReceber AS IdConta, cr.NumeroDocumento, cr.Descricao, cr.DataEmissao,
+                  cr.SaldoDevedor, cr.IdStatusContaReceber AS IdStatus, cli.NomeCliente AS Contraparte
+           FROM ContaReceber cr
+           LEFT JOIN Cliente cli ON cli.idCliente = cr.idCliente
+           WHERE cr.IdStatusContaReceber IN ${STATUS_EM_ABERTO}
+           ORDER BY cr.DataEmissao ASC`;
+
+    const result = await pool.request().query(query);
+    res.json(
+      result.recordset.map((r) => ({
+        idConta: r.IdConta,
+        numeroDocumento: r.NumeroDocumento,
+        descricao: r.Descricao,
+        dataEmissao: r.DataEmissao,
+        saldoDevedor: Number(r.SaldoDevedor),
+        idStatus: r.IdStatus,
+        contraparte: r.Contraparte,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: "Erro ao buscar contas em aberto" });
   }
 });
 

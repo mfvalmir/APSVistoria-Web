@@ -82,6 +82,31 @@
   color: var(--cor-texto-fraco);
 }
 
+.inicio-kpi-btn-imprimir {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.inicio-kpi-btn-imprimir:hover:not(:disabled) {
+  background: var(--cor-fundo-secundario);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
+}
+
+.inicio-kpi-btn-imprimir:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Alertas + próximos vencimentos */
 
 .inicio-alertas-vencimentos {
@@ -94,7 +119,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 0 0 280px;
+  /* Mesma largura de 1 dos 4 cards de .inicio-kpis (ex.: "Saldo em Caixa"): 3 gaps de 16px
+     divididos entre as 4 colunas daquela linha, mesmo container de largura total. */
+  flex: 0 0 calc((100% - 48px) / 4);
+  min-width: 220px;
 }
 
 .inicio-alerta {
@@ -117,6 +145,20 @@
   color: var(--cor-texto-fraco);
 }
 
+.inicio-alerta-linha {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inicio-alerta-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
 .inicio-alerta-critica {
   background: #d03b3b1a;
   color: var(--cor-erro);
@@ -135,6 +177,44 @@
 
 .inicio-alerta-vazia {
   opacity: 0.55;
+}
+
+.inicio-alertas-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inicio-alertas-titulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto-titulo);
+}
+
+.inicio-alertas-btn-imprimir {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.inicio-alertas-btn-imprimir:hover:not(:disabled) {
+  background: var(--cor-fundo-secundario);
+  border-color: var(--cor-marca);
+  color: var(--cor-marca);
+}
+
+.inicio-alertas-btn-imprimir:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .inicio-proximos {

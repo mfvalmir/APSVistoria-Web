@@ -28,7 +28,7 @@ import { ItemMenu } from "../api/menu";
 import ContaReceberForm from "./ContaReceberForm";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
-import { visualizarRecibo } from "../utils/recibo";
+import { visualizarRecibo, ReciboValorZeroError } from "../utils/recibo";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import ThOrdenavel from "../components/ThOrdenavel";
 import BotaoExportar from "../components/BotaoExportar";
@@ -227,8 +227,12 @@ function ContaReceberPage({ permissoes, navegarPara, voltarInicio }: ContaRecebe
         }${c.Descricao ? ` (${c.Descricao})` : ""}`,
         observacao: p.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoRecibo(null);
     }

@@ -18,6 +18,11 @@ const config: sql.config = {
     // gravações de "new Date()" (dataAlteracao etc.) 3h adiantadas.
     useUTC: false,
   },
+  // Default da lib é 15s - curto demais para absorver uma lentidão pontual do SQL Server
+  // logo após uma sequência de INSERTs (ex: criar Cliente + Vistoria em seguida), que já
+  // foi observada estourando esse limite mesmo com a query da listagem sendo instantânea
+  // em condições normais.
+  requestTimeout: 30000,
   pool: {
     max: 10,
     min: 0,

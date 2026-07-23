@@ -21,7 +21,7 @@ import { ItemMenu } from "../api/menu";
 import VistoriaForm from "./VistoriaForm";
 import ContaReceberBaixaModal from "./ContaReceberBaixaModal";
 import ContaReceberEstornoModal from "./ContaReceberEstornoModal";
-import { visualizarRecibo } from "../utils/recibo";
+import { visualizarRecibo, ReciboValorZeroError } from "../utils/recibo";
 import SeletorColunas, { OpcaoColuna } from "../components/SeletorColunas";
 import ThOrdenavel from "../components/ThOrdenavel";
 import BotaoExportar from "../components/BotaoExportar";
@@ -213,8 +213,12 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
         } - Veículo placa ${v.PlacaVeiculo} - Serviço: ${v.DescricaoServico || "-"}`,
         observacao: p.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoRecibo(null);
     }
@@ -242,8 +246,12 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
         } - Serviço: ${v.DescricaoServico || "-"}`,
         observacao: v.Observacao,
       });
-    } catch {
-      mostrarToast("Não foi possível gerar o recibo", "erro");
+    } catch (err) {
+      if (err instanceof ReciboValorZeroError) {
+        await confirmar({ titulo: "Recibo não gerado", mensagem: err.message, apenasOk: true });
+      } else {
+        mostrarToast("Não foi possível gerar o recibo", "erro");
+      }
     } finally {
       setGerandoReciboAVista(null);
     }
@@ -270,6 +278,12 @@ function VistoriaPage({ permissoes, navegarPara, voltarInicio }: VistoriaPagePro
     try {
       const dados = await listarVistorias(busca || undefined, status);
       setVistorias(dados);
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        mostrarToast(err.response.data?.erro || "Não foi possível buscar as vistorias", "erro");
+      } else {
+        mostrarToast("Não foi possível conectar ao servidor. Tente novamente.", "erro");
+      }
     } finally {
       setCarregando(false);
     }
